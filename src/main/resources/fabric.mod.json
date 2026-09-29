@@ -3,7 +3,7 @@
 	"id": "treefactory-light",
 	"version": "${version}",
 	"name": "Treefactory Light",
-	"description": "This is an example description! Tell everyone what your mod is about!",
+	"description": "Procedural trees with live previews, presets and undo. Beta for creative builders.",
 	"authors": [
 		"Me!"
 	],
@@ -23,7 +23,7 @@
 		]
 	},
 	"mixins": [
-		"treefactory-light.mixins.json"
+		{"config": "treefactory-light.client.mixins.json", "environment": "client"}
 	],
 	"depends": {
 		"fabricloader": ">=0.19.5",
