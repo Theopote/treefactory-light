@@ -10,6 +10,8 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import com.mojang.blaze3d.platform.InputConstants;
+import org.jspecify.annotations.NonNull;
+
 import java.util.*;
 
 public final class DrawerScreen extends Screen {
@@ -91,7 +93,7 @@ public final class DrawerScreen extends Screen {
         }
         g.text(font,Component.translatable("treefactory.preview_hint"),panel+12,10,0xFFE2F5E9);
         g.text(font,state.status(),panel+12,height-39,0xFF9CE7BD);
-        Component target=state.origin()==null ? Component.translatable("treefactory.aim_first") : Component.translatable("treefactory.target",state.origin().toShortString());
+        Component target=state.origin()==null ? Component.translatable("treefactory.aim_first") : Component.translatable("treefactory.target", Objects.requireNonNull(state.origin()).toShortString());
         g.text(font,target,panel+12,height-24,state.origin()==null?0xFFFFC580:0xFFB5CDBF);
     }
     @Override public boolean mouseScrolled(double x,double y,double horizontal,double vertical) {
@@ -106,15 +108,15 @@ public final class DrawerScreen extends Screen {
         if(event.x()>=panel && event.button()==InputConstants.MOUSE_BUTTON_LEFT) { rotating=true; return true; }
         return super.mouseClicked(event,doubleClick);
     }
-    @Override public boolean mouseDragged(MouseButtonEvent event,double dx,double dy) {
+    @Override public boolean mouseDragged(@NonNull MouseButtonEvent event, double dx, double dy) {
         if(rotating && event.button()==InputConstants.MOUSE_BUTTON_LEFT) { angle+=(float)dx*.012f; return true; }
         return super.mouseDragged(event,dx,dy);
     }
-    @Override public boolean mouseReleased(MouseButtonEvent event) {
+    @Override public boolean mouseReleased(@NonNull MouseButtonEvent event) {
         if(rotating && event.button()==InputConstants.MOUSE_BUTTON_LEFT) { rotating=false; return true; }
         return super.mouseReleased(event);
     }
-    @Override public void extractBackground(GuiGraphicsExtractor g,int x,int y,float delta) {}
+    @Override public void extractBackground(@NonNull GuiGraphicsExtractor g, int x, int y, float delta) {}
     @Override public boolean isPauseScreen() { return false; }
     @Override public boolean isInGameUi() { return true; }
 }

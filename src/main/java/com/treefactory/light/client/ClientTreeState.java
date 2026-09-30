@@ -4,6 +4,7 @@ import com.treefactory.light.TreefactoryLight;
 import com.treefactory.light.core.config.*;
 import com.treefactory.light.core.tree.TreeBuildTask;
 import com.treefactory.light.network.*;
+import com.treefactory.light.util.WorldBatchPaster;
 import com.treefactory.light.client.gui.DrawerScreen;
 import com.treefactory.light.client.gui.render.ThumbnailFBOMaker;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
@@ -34,6 +35,9 @@ public final class ClientTreeState {
     public String status() { return status; }
     public void update(TreeConfig next) {
         if(config.equals(next)) return;
+        // Imported presets may reference missing blocks or blocks outside the allowed palette.
+        try { WorldBatchPaster.palette(next.logBlock(),false); WorldBatchPaster.palette(next.leavesBlock(),true); }
+        catch(IllegalArgumentException e) { toast("treefactory.invalid_palette"); return; }
         config=next; revision.incrementAndGet(); dirty=true; changedAt=System.nanoTime();
     }
     public boolean holdingWand() {
