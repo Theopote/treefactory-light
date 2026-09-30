@@ -14,7 +14,7 @@ public final class PresetStore {
     public PresetStore(Path directory) { this.directory = directory; }
     public Path thumbnail(String id) {
         if (!id.matches("[a-zA-Z0-9_-]+")) throw new IllegalArgumentException("Invalid preset id");
-        return directory.resolve(id + ".png");
+        return directory.resolve(id + "-v2.png");
     }
     public Preset save(String name, String author, TreeConfig config) throws IOException {
         if (name == null || name.isBlank() || name.length()>64) throw new IllegalArgumentException("Name must contain 1–64 characters");

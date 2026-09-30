@@ -18,7 +18,7 @@ public final class SpaceColonizer {
         double height = config.scale().height;
         double width = height * (.22 + .38 * config.spread()) * config.canopyScale();
         double halfHeight = height * .38 * config.canopyScale();
-        double crownCenter = height * .76;
+        double crownCenter = config.canopyShape()==CanopyShape.SPHERE ? Math.max(height*.76,width+2) : height*.76;
         List<Vector3> attractors = new ArrayList<>();
         int count = Math.min(1500,(int)((180 + 400 * config.fullness()) * config.attractionDensity()));
         for (int i = 0; i < count; i++) {

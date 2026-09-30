@@ -42,7 +42,57 @@ public enum CanopyShape implements ICanopyShape {
             }
             return best;
         }
+    },
+    SPINDLE {
+        public double field(double x,double y,double z) {
+            double cap=Math.max(0,Math.abs(y)-.42)/.58;
+            return Math.max(Math.abs(y)-1,x*x+z*z-(.72*.72)*(1-cap*cap));
+        }
+    },
+    PARABOLOID {
+        public double field(double x,double y,double z) {
+            double t=(y+1)*.5;
+            return Math.max(Math.abs(y)-1,x*x+z*z-(1-t));
+        }
+    },
+    OVOID {
+        public double field(double x,double y,double z) { return ovalField(x,y,z,.38); }
+    },
+    PROLATE_ELLIPSOID {
+        public double field(double x,double y,double z) { return (x*x+z*z)/(.7*.7)+y*y-1; }
+    },
+    OBLATE_ELLIPSOID {
+        public double field(double x,double y,double z) { return x*x+z*z+y*y/(.58*.58)-1; }
+    },
+    OBOVATE {
+        public double field(double x,double y,double z) { return ovalField(x,y,z,.68); }
+    },
+    INVERTED_PARABOLOID {
+        public double field(double x,double y,double z) {
+            double t=(y+1)*.5;
+            return Math.max(Math.abs(y)-1,x*x+z*z-t);
+        }
+    },
+    HYPERBOLOID {
+        public double field(double x,double y,double z) {
+            return Math.max(Math.abs(y)-1,x*x+z*z-(.38+.62*y*y));
+        }
+    },
+    NEILOID {
+        public double field(double x,double y,double z) {
+            double t=(y+1)*.5;
+            double radius=(1-t)*(1-t);
+            return Math.max(Math.abs(y)-1,Math.hypot(x,z)-radius);
+        }
     };
+    private static double ovalField(double x,double y,double z,double peak) {
+        double t=(y+1)*.5;
+        if(t<0 || t>1) return Math.abs(y)-1;
+        double alpha=peak*2,beta=(1-peak)*2;
+        double maximum=Math.pow(peak,alpha)*Math.pow(1-peak,beta);
+        double radius2=Math.pow(t,alpha)*Math.pow(1-t,beta)/maximum;
+        return Math.max(Math.abs(y)-1,x*x+z*z-radius2);
+    }
     public static CanopyShape forPreset(TreePreset preset) {
         return switch(preset) { case PINE -> CONE; case WILLOW -> UMBRELLA; case DEAD -> HEMISPHERE; default -> ELLIPSOID; };
     }

@@ -94,6 +94,7 @@ class TreeAlgorithmsTest {
         assertEquals(a.sampleSimplex(.4,.7,.3),a.sampleSimplex(.400001,.7,.3),.0001);
     }
     @Test void canopyShapesRespectTheirGeometryAndRemainDeterministic() {
+        assertEquals(17,CanopyShape.values().length);
         for(CanopyShape shape:CanopyShape.values()) {
             assertTrue(shape.field(0,0,0)<=0 || shape==CanopyShape.SPINDLE_MULTI_LAYER,shape.name());
             assertTrue(shape.field(2,0,0)>0,shape.name());
@@ -105,6 +106,10 @@ class TreeAlgorithmsTest {
         assertTrue(CanopyShape.HEMISPHERE.field(0,-.5,0)>0);
         assertTrue(CanopyShape.CONE.field(.8,.8,0)>0);
         assertTrue(CanopyShape.CYLINDER.field(.8,.8,0)<0);
+        assertTrue(CanopyShape.OVOID.field(.8,-.24,0)<CanopyShape.OVOID.field(.8,.36,0));
+        assertTrue(CanopyShape.OBOVATE.field(.8,.36,0)<CanopyShape.OBOVATE.field(.8,-.24,0));
+        assertTrue(CanopyShape.HYPERBOLOID.field(.8,0,0)>CanopyShape.HYPERBOLOID.field(.8,.9,0));
+        assertTrue(CanopyShape.NEILOID.field(.5,0,0)>CanopyShape.CONE.field(.5,0,0));
     }
     @Test void weightedCanopyRolesFollowConfiguredProbabilities() {
         TreeConfig config=TreeConfig.defaults().withBlockPalette(TreeConfig.defaults().blockPalette().withWeights(.8,.15,.05));

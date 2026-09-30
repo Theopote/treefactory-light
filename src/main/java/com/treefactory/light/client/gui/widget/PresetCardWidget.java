@@ -21,6 +21,7 @@ public final class PresetCardWidget extends Button {
         graphics.outline(getX(),getY(),width,height,selected?0xFF69DFB1:0xFF37584D);
         var texture=ThumbnailFBOMaker.texture(preset.id(),state.store.thumbnail(preset.id()));
         var preview=state.preview();
+        ThumbnailFBOMaker.ensure(preset,selected?preview:null,state.store.thumbnail(preset.id()));
         if(isHovered() && selected && preview!=null) {
             graphics.guiRenderState.addPicturesInPictureState(new TreePictureRenderer.State(preview,(System.nanoTime()%30_000_000_000L)/30_000_000_000f*(float)Math.PI*2,
                     false,getX()+2,getY()+2,getX()+50,getY()+50,(float)(42/preview.extent()),graphics.scissorStack.peek()));
