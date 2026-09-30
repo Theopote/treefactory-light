@@ -46,26 +46,46 @@ public final class PresetStore {
     }
     public static String encode(String name, String author, TreeConfig c) {
         JsonObject root = new JsonObject();
-        root.addProperty("name",name); root.addProperty("author",author); root.addProperty("version","1.0");
+        root.addProperty("name",name); root.addProperty("author",author); root.addProperty("version","1.1");
         root.addProperty("preset_type",c.preset().id()); root.addProperty("scale",c.scale().id()); root.addProperty("seed",c.seed());
         JsonObject dna = new JsonObject();
         dna.addProperty("crookedness",c.crookedness()); dna.addProperty("spread",c.spread()); dna.addProperty("fullness",c.fullness());
         root.add("dna",dna);
+        JsonObject canopy=new JsonObject();
+        canopy.addProperty("shape",c.canopyShape().name().toLowerCase(Locale.ROOT));
+        canopy.addProperty("scale",c.canopyScale()); canopy.addProperty("density",c.attractionDensity());
+        canopy.addProperty("pipe_exponent",c.pipeExponent()); root.add("canopy",canopy);
         JsonObject palette = new JsonObject();
-        palette.addProperty("log_block",c.logBlock()); palette.addProperty("leaves_block",c.leavesBlock()); root.add("palette",palette);
+        BlockPalette p=c.blockPalette();
+        palette.addProperty("log_block",p.mainTrunk()); palette.addProperty("leaves_block",p.primaryLeaf());
+        palette.addProperty("thick_branch",p.thickBranch()); palette.addProperty("thin_branch",p.thinBranch());
+        palette.addProperty("secondary_leaf",p.secondaryLeaf()); palette.addProperty("accent_block",p.accentBlock());
+        palette.addProperty("primary_weight",p.primaryWeight()); palette.addProperty("secondary_weight",p.secondaryWeight());
+        palette.addProperty("accent_weight",p.accentWeight()); root.add("palette",palette);
         return GSON.toJson(root);
     }
     public static Preset decode(String id, String json) {
         if (json.length()>16384) throw new IllegalArgumentException("Preset too large");
         JsonObject root = JsonParser.parseString(json).getAsJsonObject();
-        if (!"1.0".equals(root.get("version").getAsString())) throw new IllegalArgumentException("Unsupported preset version");
+        String version=root.get("version").getAsString();
+        if (!"1.0".equals(version) && !"1.1".equals(version)) throw new IllegalArgumentException("Unsupported preset version");
         String name = root.get("name").getAsString(), author = root.get("author").getAsString();
         if (name.isBlank() || name.length()>64 || author.length()>64) throw new IllegalArgumentException("Invalid preset metadata");
         JsonObject dna = root.getAsJsonObject("dna"), palette = root.getAsJsonObject("palette");
-        TreeConfig config = new TreeConfig(TreePreset.valueOf(root.get("preset_type").getAsString().toUpperCase(Locale.ROOT)),
+        TreePreset type=TreePreset.valueOf(root.get("preset_type").getAsString().toUpperCase(Locale.ROOT));
+        TreeConfig legacy = new TreeConfig(type,
                 TreeScale.valueOf(root.get("scale").getAsString().toUpperCase(Locale.ROOT)),root.get("seed").getAsLong(),
                 dna.get("crookedness").getAsDouble(),dna.get("spread").getAsDouble(),dna.get("fullness").getAsDouble(),
                 palette.get("log_block").getAsString(),palette.get("leaves_block").getAsString());
+        if("1.0".equals(version)) return new Preset(id,name,author,legacy);
+        JsonObject canopy=root.getAsJsonObject("canopy");
+        BlockPalette blocks=new BlockPalette(legacy.logBlock(),palette.get("thick_branch").getAsString(),
+                palette.get("thin_branch").getAsString(),legacy.leavesBlock(),palette.get("secondary_leaf").getAsString(),
+                palette.get("accent_block").getAsString(),palette.get("primary_weight").getAsDouble(),
+                palette.get("secondary_weight").getAsDouble(),palette.get("accent_weight").getAsDouble());
+        TreeConfig config=new TreeConfig(type,legacy.scale(),legacy.seed(),legacy.crookedness(),legacy.spread(),legacy.fullness(),
+                CanopyShape.valueOf(canopy.get("shape").getAsString().toUpperCase(Locale.ROOT)),canopy.get("scale").getAsDouble(),
+                canopy.get("density").getAsDouble(),canopy.get("pipe_exponent").getAsDouble(),blocks);
         return new Preset(id,name,author,config);
     }
 }

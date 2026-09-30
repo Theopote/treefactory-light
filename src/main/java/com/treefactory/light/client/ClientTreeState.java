@@ -36,7 +36,7 @@ public final class ClientTreeState {
     public void update(TreeConfig next) {
         if(config.equals(next)) return;
         // Imported presets may reference missing blocks or blocks outside the allowed palette.
-        try { WorldBatchPaster.palette(next.logBlock(),false); WorldBatchPaster.palette(next.leavesBlock(),true); }
+        try { WorldBatchPaster.palette(next); }
         catch(IllegalArgumentException e) { toast("treefactory.invalid_palette"); return; }
         config=next; revision.incrementAndGet(); dirty=true; changedAt=System.nanoTime();
     }

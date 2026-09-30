@@ -35,19 +35,22 @@ public final class TreePictureRenderer extends PictureInPictureRenderer<TreePict
     /** Uses the current resource pack's baked block models rather than placeholder thumbnail geometry. */
     public static void submitBlocks(PreviewSnapshot snapshot,PoseStack pose,SubmitNodeCollector collector) {
         Minecraft mc=Minecraft.getInstance();
-        var log=WorldBatchPaster.palette(snapshot.config().logBlock(),false);
-        var leaves=WorldBatchPaster.palette(snapshot.config().leavesBlock(),true);
-        List<BlockStateModelPart> logParts=new ArrayList<>(),leafParts=new ArrayList<>();
+        var palette=WorldBatchPaster.palette(snapshot.config());
+        EnumMap<Voxelizer.Material,List<BlockStateModelPart>> parts=new EnumMap<>(Voxelizer.Material.class);
+        EnumMap<Voxelizer.Material,int[]> tints=new EnumMap<>(Voxelizer.Material.class);
         var models=mc.getModelManager().getBlockStateModelSet();
-        models.get(log).collectParts(RandomSource.create(snapshot.config().seed()),logParts);
-        models.get(leaves).collectParts(RandomSource.create(snapshot.config().seed()),leafParts);
-        int[] tint=mc.getBlockColors().getTintSources(leaves).stream().mapToInt(source->source.color(leaves)).toArray();
-        int[] logTint=mc.getBlockColors().getTintSources(log).stream().mapToInt(source->source.color(log)).toArray();
+        for(var material:Voxelizer.Material.values()) {
+            var block=palette.get(material);
+            List<BlockStateModelPart> modelParts=new ArrayList<>();
+            models.get(block).collectParts(RandomSource.create(snapshot.config().seed()),modelParts);
+            parts.put(material,modelParts);
+            tints.put(material,mc.getBlockColors().getTintSources(block).stream().mapToInt(source->source.color(block)).toArray());
+        }
         for(var cell:snapshot.surface()) {
-            boolean leaf=snapshot.tree().blocks().get(cell)==Voxelizer.Material.LEAVES;
+            var material=snapshot.tree().blocks().get(cell);
             pose.pushPose(); pose.translate(cell.x(),cell.y(),cell.z());
-            collector.submitBlockModel(pose,leaf?RenderTypes.cutoutMovingBlock():RenderTypes.solidMovingBlock(),
-                    leaf?leafParts:logParts,leaf?tint:logTint,0xF000F0,OverlayTexture.NO_OVERLAY,0);
+            collector.submitBlockModel(pose,material.woody()?RenderTypes.solidMovingBlock():RenderTypes.cutoutMovingBlock(),
+                    parts.get(material),tints.get(material),0xF000F0,OverlayTexture.NO_OVERLAY,0);
             pose.popPose();
         }
     }

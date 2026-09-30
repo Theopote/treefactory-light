@@ -7,7 +7,7 @@ import java.util.*;
 
 public record PreviewSnapshot(TreeConfig config, TreeBuildTask.Result tree, List<Face> faces,
                               List<Cell> surface, double centerY, double extent) {
-    public record Face(Cell cell, int side, boolean leaves) {}
+    public record Face(Cell cell, int side, Voxelizer.Material material) {}
     public static final int[][] OFFSETS={{-1,0,0},{1,0,0},{0,-1,0},{0,1,0},{0,0,-1},{0,0,1}};
     public static PreviewSnapshot create(TreeConfig config,TreeBuildTask.Result tree) {
         List<Face> faces=new ArrayList<>(); List<Cell> surface=new ArrayList<>();
@@ -17,8 +17,8 @@ public record PreviewSnapshot(TreeConfig config, TreeBuildTask.Result tree, List
             for(int side=0;side<6;side++) {
                 int[] d=OFFSETS[side];
                 var neighbor=tree.blocks().get(new Cell(c.x()+d[0],c.y()+d[1],c.z()+d[2]));
-                if(neighbor==null || entry.getValue()==Voxelizer.Material.LOG && neighbor==Voxelizer.Material.LEAVES) {
-                    faces.add(new Face(c,side,entry.getValue()==Voxelizer.Material.LEAVES)); visible=true;
+                if(neighbor==null || entry.getValue().woody() && !neighbor.woody()) {
+                    faces.add(new Face(c,side,entry.getValue())); visible=true;
                 }
             }
             if(visible) surface.add(c);

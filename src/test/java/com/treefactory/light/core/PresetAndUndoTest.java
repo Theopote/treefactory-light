@@ -20,8 +20,18 @@ class PresetAndUndoTest {
     }
     @Test void unknownVersionsAndNonFiniteNumbersAreRejected() {
         String json=PresetStore.encode("Oak","Player",TreeConfig.defaults());
-        assertThrows(IllegalArgumentException.class,()->PresetStore.decode("id",json.replace("\"1.0\"","\"2.0\"")));
+        assertThrows(IllegalArgumentException.class,()->PresetStore.decode("id",json.replace("\"1.1\"","\"2.0\"")));
         assertThrows(IllegalArgumentException.class,()->PresetStore.decode("id",json.replace("0.35","1e999")));
+    }
+    @Test void versionOnePresetsGainDefaultGeometryAndPalette() {
+        String current=PresetStore.encode("Oak","Player",TreeConfig.defaults());
+        var root=com.google.gson.JsonParser.parseString(current).getAsJsonObject();
+        root.addProperty("version","1.0"); root.remove("canopy");
+        var palette=root.getAsJsonObject("palette");
+        for(String key:List.of("thick_branch","thin_branch","secondary_leaf","accent_block",
+                "primary_weight","secondary_weight","accent_weight")) palette.remove(key);
+        var loaded=PresetStore.decode("legacy",root.toString()).config();
+        assertEquals(TreeConfig.defaults(),loaded);
     }
     @Test void historyIsBoundedLifoAndIsolatedByPlayer() {
         UndoHistory<Integer> history=new UndoHistory<>(); UUID a=UUID.randomUUID(),b=UUID.randomUUID();

@@ -37,7 +37,10 @@ public final class HologramRenderer {
     }
     public static void draw(PreviewSnapshot snapshot,PoseStack.Pose pose,VertexConsumer buffer) {
         for(var face:snapshot.faces()) {
-            int color=face.leaves()?0x7052E8BA:0xB079DBFF;
+            int color=switch(face.material()) {
+                case MAIN_TRUNK -> 0xB079DBFF; case THICK_BRANCH -> 0xB06CBFE8; case THIN_BRANCH -> 0xB050A8CE;
+                case PRIMARY_LEAF -> 0x7052E8BA; case SECONDARY_LEAF -> 0x70EF9CD1; case ACCENT -> 0x70EED981;
+            };
             for(float[] v:VERTICES[face.side()])
                 buffer.addVertex(pose.pose(),face.cell().x()+v[0],face.cell().y()+v[1],face.cell().z()+v[2]).setColor(color);
         }

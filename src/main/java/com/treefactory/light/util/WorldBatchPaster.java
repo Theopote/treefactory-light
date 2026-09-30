@@ -51,6 +51,31 @@ public final class WorldBatchPaster {
         if (leaves && state.hasProperty(BlockStateProperties.PERSISTENT)) state = state.setValue(BlockStateProperties.PERSISTENT,true);
         return state;
     }
+    public static EnumMap<Voxelizer.Material,BlockState> palette(TreeConfig config) {
+        var p=config.blockPalette();
+        EnumMap<Voxelizer.Material,BlockState> result=new EnumMap<>(Voxelizer.Material.class);
+        result.put(Voxelizer.Material.MAIN_TRUNK,palette(p.mainTrunk(),false));
+        result.put(Voxelizer.Material.THICK_BRANCH,palette(p.thickBranch(),false));
+        result.put(Voxelizer.Material.THIN_BRANCH,choice(p.thinBranch(),BlockTags.PLANKS));
+        result.put(Voxelizer.Material.PRIMARY_LEAF,palette(p.primaryLeaf(),true));
+        result.put(Voxelizer.Material.SECONDARY_LEAF,palette(p.secondaryLeaf(),true));
+        result.put(Voxelizer.Material.ACCENT,accent(p.accentBlock()));
+        return result;
+    }
+    private static BlockState choice(String id,net.minecraft.tags.TagKey<Block> tag) {
+        BlockState state=BuiltInRegistries.BLOCK.getOptional(Identifier.parse(id))
+                .orElseThrow(()->new IllegalArgumentException("Unknown block: "+id)).defaultBlockState();
+        if(!state.is(tag) && !state.is(BlockTags.FENCES)) throw new IllegalArgumentException("Choose planks or a fence");
+        return state;
+    }
+    private static BlockState accent(String id) {
+        BlockState state=BuiltInRegistries.BLOCK.getOptional(Identifier.parse(id))
+                .orElseThrow(()->new IllegalArgumentException("Unknown block: "+id)).defaultBlockState();
+        if(state.getBlock()!=Blocks.MOSS_BLOCK && state.getBlock()!=Blocks.OCHRE_FROGLIGHT
+                && state.getBlock()!=Blocks.PEARLESCENT_FROGLIGHT && state.getBlock()!=Blocks.VERDANT_FROGLIGHT)
+            throw new IllegalArgumentException("Choose moss or froglight for accent");
+        return state;
+    }
     public void build(ServerPlayer player, BlockPos origin, TreeConfig config) {
         if (!acceptAction(player)) return;
         if (!authorized(player)) return;
@@ -60,8 +85,8 @@ public final class WorldBatchPaster {
         ServerLevel level = player.level();
         if (player.distanceToSqr(origin.getX()+.5,origin.getY()+.5,origin.getZ()+.5)>64*64
                 || !accessible(level,player,origin)) { message(player,"treefactory.invalid_target"); return; }
-        final BlockState log, leaves;
-        try { log=palette(config.logBlock(),false); leaves=palette(config.leavesBlock(),true); }
+        final EnumMap<Voxelizer.Material,BlockState> materials;
+        try { materials=palette(config); }
         catch (IllegalArgumentException e) { message(player,"treefactory.invalid_palette"); return; }
         AtomicBoolean cancel = new AtomicBoolean(); pending.put(id,cancel);
         MinecraftServer server = level.getServer();
@@ -69,7 +94,7 @@ public final class WorldBatchPaster {
         CompletableFuture.supplyAsync(() -> {
             TreeBuildTask.Result result = new TreeBuildTask().build(config,cancel::get);
             Map<BlockPos,BlockState> blocks = new LinkedHashMap<>();
-            result.blocks().forEach((p,m) -> blocks.put(origin.offset(p.x(),p.y(),p.z()),m==Voxelizer.Material.LOG ? log : leaves));
+            result.blocks().forEach((p,m) -> blocks.put(origin.offset(p.x(),p.y(),p.z()),materials.get(m)));
             return blocks;
         },ForkJoinPool.commonPool()).whenComplete((blocks,error) -> {
             if (cancel.get()) return;

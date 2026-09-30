@@ -3,6 +3,7 @@ package com.treefactory.light.client.gui.widget;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.network.chat.Component;
 import java.util.function.DoubleConsumer;
+import java.util.Locale;
 
 public final class DNAControlSlider extends AbstractSliderButton {
     private final String key;
@@ -10,6 +11,14 @@ public final class DNAControlSlider extends AbstractSliderButton {
     public DNAControlSlider(int x,int y,int width,String key,double value,DoubleConsumer changed) {
         super(x,y,width,20,Component.empty(),value); this.key=key; this.changed=changed; updateMessage();
     }
-    @Override protected void updateMessage() { setMessage(Component.translatable(key,(int)Math.round(value*100))); }
+    @Override protected void updateMessage() {
+        Object shown=switch(key) {
+            case "treefactory.canopy_scale" -> String.format(Locale.ROOT,"%.2f",.75+1.25*value);
+            case "treefactory.attraction_density" -> String.format(Locale.ROOT,"%.2f",.5+1.5*value);
+            case "treefactory.pipe_exponent" -> String.format(Locale.ROOT,"%.2f",2.5+.5*value);
+            default -> (int)Math.round(value*100);
+        };
+        setMessage(Component.translatable(key,shown));
+    }
     @Override protected void applyValue() { changed.accept(value); }
 }

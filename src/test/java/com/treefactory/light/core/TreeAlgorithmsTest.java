@@ -28,7 +28,8 @@ class TreeAlgorithmsTest {
         var result=new PipeModelEngine().apply(List.of(new TreeNode(Vector3.ZERO,-1,0),
                 new TreeNode(new Vector3(1,1,0),0,0),new TreeNode(new Vector3(-1,1,0),0,0)));
         assertEquals(.5,result.get(1).radius());
-        assertEquals(Math.pow(2*Math.pow(.5,2.3),1/2.3)+.1,result.getFirst().radius(),1e-12);
+        assertEquals(Math.pow(2*Math.pow(.5,2.75),1/2.75),result.getFirst().radius(),1e-12);
+        assertTrue(result.getFirst().radius()<.7);
         assertThrows(IllegalArgumentException.class,()->new PipeModelEngine().apply(List.of(new TreeNode(Vector3.ZERO,0,1))));
     }
     @Test void frustumUsesInterpolatedRadiusAndHandlesDegenerateSegments() {
@@ -43,8 +44,8 @@ class TreeAlgorithmsTest {
     @Test void voxelizationKeepsTrunkConnectedAndLeavesNeverReplaceLogs() {
         List<TreeNode> nodes=List.of(new TreeNode(new Vector3(.5,.5,.5),-1,.5),new TreeNode(new Vector3(.5,5.5,.5),0,.5));
         var blocks=new Voxelizer().voxelize(nodes,TreeConfig.defaults(),()->false);
-        for(int y=0;y<=5;y++) assertEquals(Voxelizer.Material.LOG,blocks.get(new Cell(0,y,0)));
-        assertTrue(blocks.containsValue(Voxelizer.Material.LEAVES));
+        for(int y=0;y<=5;y++) assertTrue(blocks.get(new Cell(0,y,0)).woody());
+        assertTrue(blocks.values().stream().anyMatch(m->!m.woody()));
         assertTrue(blocks.keySet().stream().allMatch(p->p.y()>=0));
     }
     @Test void allPresetsAndSizesStayInsideBudgets() {
@@ -52,7 +53,7 @@ class TreeAlgorithmsTest {
             for(TreePreset preset:TreePreset.values()) for(TreeScale size:TreeScale.values()) {
                 var result=new TreeBuildTask().build(TreeConfig.defaults().withPreset(preset).withScale(size),()->false);
                 assertFalse(result.blocks().isEmpty()); assertTrue(result.blocks().size()<=Voxelizer.MAX_BLOCKS);
-                if(preset==TreePreset.DEAD) assertFalse(result.blocks().containsValue(Voxelizer.Material.LEAVES));
+                if(preset==TreePreset.DEAD) assertTrue(result.blocks().values().stream().allMatch(Voxelizer.Material::woody));
             }
         });
     }
@@ -68,14 +69,14 @@ class TreeAlgorithmsTest {
                     .withDna(bits&1,(bits>>1)&1,(bits>>2)&1);
             var result=new TreeBuildTask().build(config,()->false);
             assertTrue(result.blocks().size()<=Voxelizer.MAX_BLOCKS);
-            assertTrue(result.blocks().containsValue(Voxelizer.Material.LOG));
-            if(config.fullness()==0) assertFalse(result.blocks().containsValue(Voxelizer.Material.LEAVES));
+            assertTrue(result.blocks().values().stream().anyMatch(Voxelizer.Material::woody));
+            if(config.fullness()==0) assertTrue(result.blocks().values().stream().allMatch(Voxelizer.Material::woody));
         }
     }
     @Test void generatedLogsFormOneFaceConnectedTree() {
         for(TreePreset preset:TreePreset.values()) {
             var blocks=new TreeBuildTask().build(TreeConfig.defaults().withPreset(preset),()->false).blocks();
-            Set<Cell> logs=new HashSet<>(); blocks.forEach((cell,material)->{if(material==Voxelizer.Material.LOG) logs.add(cell);});
+            Set<Cell> logs=new HashSet<>(); blocks.forEach((cell,material)->{if(material.woody()) logs.add(cell);});
             Deque<Cell> queue=new ArrayDeque<>(); Cell first=logs.iterator().next(); logs.remove(first); queue.add(first);
             int[][] steps={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
             while(!queue.isEmpty()) {
@@ -89,5 +90,41 @@ class TreeAlgorithmsTest {
         NoiseGenerator a=new NoiseGenerator(123),b=new NoiseGenerator(123);
         assertEquals(a.sample(.4,.7,.3),b.sample(.4,.7,.3));
         assertEquals(a.sample(.4,.7,.3),a.sample(.400001,.7,.3),.0001);
+        assertEquals(a.sampleSimplex(.4,.7,.3),b.sampleSimplex(.4,.7,.3));
+        assertEquals(a.sampleSimplex(.4,.7,.3),a.sampleSimplex(.400001,.7,.3),.0001);
+    }
+    @Test void canopyShapesRespectTheirGeometryAndRemainDeterministic() {
+        for(CanopyShape shape:CanopyShape.values()) {
+            assertTrue(shape.field(0,0,0)<=0 || shape==CanopyShape.SPINDLE_MULTI_LAYER,shape.name());
+            assertTrue(shape.field(2,0,0)>0,shape.name());
+            TreeConfig config=TreeConfig.defaults().withCanopy(shape,1.4,1.2);
+            var first=new SpaceColonizer().generate(config);
+            assertEquals(first,new SpaceColonizer().generate(config));
+            assertTrue(first.size()>20,shape.name());
+        }
+        assertTrue(CanopyShape.HEMISPHERE.field(0,-.5,0)>0);
+        assertTrue(CanopyShape.CONE.field(.8,.8,0)>0);
+        assertTrue(CanopyShape.CYLINDER.field(.8,.8,0)<0);
+    }
+    @Test void weightedCanopyRolesFollowConfiguredProbabilities() {
+        TreeConfig config=TreeConfig.defaults().withBlockPalette(TreeConfig.defaults().blockPalette().withWeights(.8,.15,.05));
+        var a=new TreeBuildTask().build(config,()->false).blocks();
+        var b=new TreeBuildTask().build(config,()->false).blocks();
+        assertEquals(a,b);
+        long leafCount=a.values().stream().filter(m->!m.woody()).count();
+        assertTrue(leafCount>100);
+        double primary=a.values().stream().filter(m->m==Voxelizer.Material.PRIMARY_LEAF).count()/(double)leafCount;
+        double secondary=a.values().stream().filter(m->m==Voxelizer.Material.SECONDARY_LEAF).count()/(double)leafCount;
+        assertEquals(.8,primary,.1); assertEquals(.15,secondary,.08);
+        assertThrows(IllegalArgumentException.class,()->config.withPipeExponent(2.2));
+        assertThrows(IllegalArgumentException.class,()->config.withCanopy(CanopyShape.SPHERE,2.5,1));
+    }
+    @Test void largestSupportedCanopyStaysWithinBudget() {
+        assertTimeout(Duration.ofSeconds(15),()->{
+            TreeConfig config=TreeConfig.defaults().withScale(TreeScale.GIANT)
+                    .withCanopy(CanopyShape.SPHERE,2,2);
+            var result=new TreeBuildTask().build(config,()->false);
+            assertTrue(result.blocks().size()<=Voxelizer.MAX_BLOCKS);
+        });
     }
 }

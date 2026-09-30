@@ -16,31 +16,31 @@ public final class SpaceColonizer {
         Random random = new Random(config.seed());
         NoiseGenerator noise = new NoiseGenerator(config.seed());
         double height = config.scale().height;
-        double width = height * (.16 + .38 * config.spread());
+        double width = height * (.22 + .38 * config.spread()) * config.canopyScale();
+        double halfHeight = height * .38 * config.canopyScale();
+        double crownCenter = height * .76;
         List<Vector3> attractors = new ArrayList<>();
-        int count = (int)(100 + 320 * config.fullness());
+        int count = Math.min(1500,(int)((180 + 400 * config.fullness()) * config.attractionDensity()));
         for (int i = 0; i < count; i++) {
             double x, y, z;
-            do { x = random.nextDouble()*2-1; y = random.nextDouble()*2-1; z = random.nextDouble()*2-1;
-            } while (x*x + y*y + z*z > 1);
-            Vector3 point = switch (config.preset()) {
-                case PINE -> {
-                    double t = random.nextDouble(), angle = random.nextDouble()*Math.PI*2;
-                    double r = Math.sqrt(random.nextDouble()) * width * (1-t) * .8;
-                    yield new Vector3(.5+Math.cos(angle)*r, height*(.3+.7*t), .5+Math.sin(angle)*r);
-                }
-                case WILLOW -> new Vector3(.5+x*width*1.2, height*(.7+y*.22), .5+z*width*1.2);
-                default -> new Vector3(.5+x*width, height*(.68+y*.32), .5+z*width);
-            };
+            int attempts=0;
+            do {
+                x=random.nextDouble()*2-1; y=random.nextDouble()*2-1; z=random.nextDouble()*2-1;
+                attempts++;
+            } while(attempts<256 && config.canopyShape().field(x,y,z) >
+                    noise.sampleSimplex(x*3.1+7,y*3.1,z*3.1)*.12);
+            if(attempts==256) { i--; continue; }
+            double vertical = config.canopyShape()==CanopyShape.SPHERE ? width : halfHeight;
+            Vector3 point = new Vector3(.5+x*width,crownCenter+y*vertical,.5+z*width);
             attractors.add(point);
         }
         List<TreeNode> nodes = new ArrayList<>();
         nodes.add(new TreeNode(new Vector3(.5,.5,.5), -1, .5));
-        for (int y = 1; y <= height*.42; y++) {
+        for (int y = 1; y <= height*.36; y++) {
             double bend = config.crookedness() * Math.sin(y*.3) * .55;
             nodes.add(new TreeNode(new Vector3(.5+bend,y+.5,.5), nodes.size()-1,.5));
         }
-        double influence = Math.max(4, height*.32), kill2 = 1.65*1.65;
+        double influence = Math.max(5, height*.4*config.canopyScale()), kill2 = 1.2*1.2;
         Set<Cell> occupied = new HashSet<>();
         for (TreeNode n : nodes) occupied.add(quantize(n.position()));
         for (int iteration = 0; iteration < MAX_ITERATIONS && nodes.size() < MAX_NODES && !attractors.isEmpty(); iteration++) {

@@ -49,10 +49,38 @@ public final class DrawerScreen extends Screen {
             addContent(new DNAControlSlider(8,y-scroll,panel-16,"treefactory.crookedness",c.crookedness(),v->state.update(state.config().withDna(v,state.config().spread(),state.config().fullness())))); y+=25;
             addContent(new DNAControlSlider(8,y-scroll,panel-16,"treefactory.spread",c.spread(),v->state.update(state.config().withDna(state.config().crookedness(),v,state.config().fullness())))); y+=25;
             addContent(new DNAControlSlider(8,y-scroll,panel-16,"treefactory.fullness",c.fullness(),v->state.update(state.config().withDna(state.config().crookedness(),state.config().spread(),v)))); y+=28;
+            addContent(button(8,y-scroll,panel-16,"treefactory.canopy."+c.canopyShape().name().toLowerCase(Locale.ROOT),()->{
+                TreeConfig now=state.config(); CanopyShape[] shapes=CanopyShape.values();
+                state.update(now.withCanopy(shapes[(now.canopyShape().ordinal()+1)%shapes.length],now.canopyScale(),now.attractionDensity())); refresh();
+            })); y+=23;
+            addContent(new DNAControlSlider(8,y-scroll,panel-16,"treefactory.canopy_scale",(c.canopyScale()-.75)/1.25,
+                    v->{TreeConfig now=state.config();state.update(now.withCanopy(now.canopyShape(),.75+1.25*v,now.attractionDensity()));})); y+=25;
+            addContent(new DNAControlSlider(8,y-scroll,panel-16,"treefactory.attraction_density",(c.attractionDensity()-.5)/1.5,
+                    v->{TreeConfig now=state.config();state.update(now.withCanopy(now.canopyShape(),now.canopyScale(),.5+1.5*v));})); y+=25;
+            addContent(new DNAControlSlider(8,y-scroll,panel-16,"treefactory.pipe_exponent",(c.pipeExponent()-2.5)/.5,
+                    v->state.update(state.config().withPipeExponent(2.5+.5*v)))); y+=28;
             Button log=button(8,y-scroll,panel-16,"treefactory.log",()->{state.update(state.config().withPalette(nextBlock(state.config().logBlock(),"_log"),state.config().leavesBlock()));refresh();});
             log.setMessage(Component.translatable("block."+c.logBlock().replace(':','.'))); addContent(log); y+=23;
             Button leaf=button(8,y-scroll,panel-16,"treefactory.leaves",()->{state.update(state.config().withPalette(state.config().logBlock(),nextBlock(state.config().leavesBlock(),"_leaves")));refresh();});
             leaf.setMessage(Component.translatable("block."+c.leavesBlock().replace(':','.'))); addContent(leaf); y+=23;
+            addContent(paletteButton(y,"treefactory.thick_branch",c.blockPalette().thickBranch(),"stripped_","_log",1)); y+=23;
+            addContent(paletteButton(y,"treefactory.thin_branch",c.blockPalette().thinBranch(),"","_planks",2)); y+=23;
+            addContent(paletteButton(y,"treefactory.secondary_leaf",c.blockPalette().secondaryLeaf(),"","_leaves",4)); y+=23;
+            addContent(button(8,y-scroll,panel-16,"treefactory.accent",()->{
+                var p=state.config().blockPalette(); String next=p.accentBlock().equals("minecraft:moss_block")?"minecraft:ochre_froglight":"minecraft:moss_block";
+                state.update(state.config().withBlockPalette(p.withBlocks(p.mainTrunk(),p.thickBranch(),p.thinBranch(),p.primaryLeaf(),p.secondaryLeaf(),next)));refresh();
+            })); y+=23;
+            Button weights=button(8,y-scroll,panel-16,"treefactory.leaf_weights",()->{
+                var p=state.config().blockPalette();
+                double[][] choices={{.8,.15,.05},{.65,.25,.10},{.95,.05,0}};
+                int index=p.primaryWeight()==.8?1:p.primaryWeight()==.65?2:0;
+                state.update(state.config().withBlockPalette(p.withWeights(choices[index][0],choices[index][1],choices[index][2])));refresh();
+            });
+            var weightsNow=c.blockPalette();
+            weights.setMessage(Component.translatable("treefactory.leaf_weights",
+                    (int)Math.round(weightsNow.primaryWeight()*100),(int)Math.round(weightsNow.secondaryWeight()*100),
+                    (int)Math.round(weightsNow.accentWeight()*100)));
+            addContent(weights); y+=23;
             addContent(button(8,y-scroll,panel-16,"treefactory.new_seed",()->state.update(state.config().withSeed(new Random().nextLong())))); y+=28;
             EditBox name=new EditBox(font,8,y-scroll,panel-16,20,Component.translatable("treefactory.preset_name"));
             name.setMaxLength(64); name.setValue(presetName); name.setResponder(value->presetName=value); addContent(name); y+=23;
@@ -71,6 +99,23 @@ public final class DrawerScreen extends Screen {
         int index=-1;
         for(int i=0;i<WOODS.length;i++) if(current.equals("minecraft:"+WOODS[i]+suffix)) index=i;
         return "minecraft:"+WOODS[(index+1)%WOODS.length]+suffix;
+    }
+    private Button paletteButton(int y,String key,String current,String prefix,String suffix,int role) {
+        Button choice=button(8,y-scroll,panel-16,key,()->{
+            var p=state.config().blockPalette();
+            String next=nextBlock(current,prefix,suffix);
+            state.update(state.config().withBlockPalette(p.withBlocks(
+                    role==0?next:p.mainTrunk(),role==1?next:p.thickBranch(),role==2?next:p.thinBranch(),
+                    role==3?next:p.primaryLeaf(),role==4?next:p.secondaryLeaf(),role==5?next:p.accentBlock())));
+            refresh();
+        });
+        choice.setMessage(Component.translatable(key).append(": ").append(Component.translatable("block."+current.replace(':','.'))));
+        return choice;
+    }
+    private String nextBlock(String current,String prefix,String suffix) {
+        int index=-1;
+        for(int i=0;i<WOODS.length;i++) if(current.equals("minecraft:"+prefix+WOODS[i]+suffix)) index=i;
+        return "minecraft:"+prefix+WOODS[(index+1)%WOODS.length]+suffix;
     }
     @Override public void extractRenderState(GuiGraphicsExtractor g,int mouseX,int mouseY,float delta) {
         g.fill(0,0,panel,height,0xF010201B); g.fill(panel-1,0,panel,height,0xFF4C876C);
