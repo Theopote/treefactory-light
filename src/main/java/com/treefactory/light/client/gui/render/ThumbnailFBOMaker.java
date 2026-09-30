@@ -50,38 +50,54 @@ public final class ThumbnailFBOMaker {
         TextureTarget target=new TextureTarget("Treefactory thumbnail",128,128,GpuFormat.RGBA8_UNORM,GpuFormat.D32_FLOAT);
         var oldProjection=RenderSystem.getProjectionMatrixBuffer(); var oldType=RenderSystem.getProjectionType();
         var oldFog=RenderSystem.getShaderFog();
-        ProjectionMatrixBuffer projectionBuffer=new ProjectionMatrixBuffer("Treefactory thumbnail projection");
-        RenderSystem.getModelViewStack().pushMatrix().identity();
-        try (FogRenderer fog=new FogRenderer()) {
+        try (ProjectionMatrixBuffer projectionBuffer = new ProjectionMatrixBuffer("Treefactory thumbnail projection"); FogRenderer fog = new FogRenderer()) {
+            RenderSystem.getModelViewStack().pushMatrix().identity();
             RenderSystem.setShaderFog(fog.getBuffer(FogRenderer.FogMode.NONE));
-            Projection projection=new Projection(); projection.setupOrtho(-1000,1000,128,128,true);
-            RenderSystem.setProjectionMatrix(projectionBuffer.getBuffer(projection),ProjectionType.ORTHOGRAPHIC);
-            RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(target.getColorTexture(),new org.joml.Vector4f(.04f,.08f,.07f,1),target.getDepthTexture(),0);
-            PoseStack pose=new PoseStack(); pose.translate(64,64,0);
-            float scale=(float)(112/request.snapshot.extent()); pose.scale(scale,scale,-scale);
-            pose.rotate(new Quaternionf().rotationZ((float)Math.PI).rotateX((float)Math.toRadians(45)).rotateY((float)Math.toRadians(45)));
-            pose.translate(0,-request.snapshot.centerY(),0);
-            SubmitNodeStorage collector=new SubmitNodeStorage();
-            TreePictureRenderer.submitBlocks(request.snapshot,pose,collector);
-            try(var frame=Minecraft.getInstance().gameRenderer.featureRenderDispatcher().prepareFrame(collector);
-                var pass=RenderSystem.getDevice().createCommandEncoder().createRenderPass(()->"Treefactory thumbnail",target.getColorTextureView(),Optional.empty(),target.getDepthTextureView(),OptionalDouble.empty())) {
-                RenderSystem.bindDefaultUniforms(pass); FeatureRenderDispatcher.renderAllFeatures(pass,frame);
+            Projection projection = new Projection();
+            projection.setupOrtho(-1000, 1000, 128, 128, true);
+            RenderSystem.setProjectionMatrix(projectionBuffer.getBuffer(projection), ProjectionType.ORTHOGRAPHIC);
+            if (target.getDepthTexture() != null) {
+                if (target.getColorTexture() != null) {
+                    RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(target.getColorTexture(), new org.joml.Vector4f(.04f, .08f, .07f, 1), target.getDepthTexture(), 0);
+                }
             }
-            Screenshot.takeScreenshot(target,image->{
+            PoseStack pose = new PoseStack();
+            pose.translate(64, 64, 0);
+            float scale = (float) (112 / request.snapshot.extent());
+            pose.scale(scale, scale, -scale);
+            pose.rotate(new Quaternionf().rotationZ((float) Math.PI).rotateX((float) Math.toRadians(45)).rotateY((float) Math.toRadians(45)));
+            pose.translate(0, -request.snapshot.centerY(), 0);
+            SubmitNodeStorage collector = new SubmitNodeStorage();
+            TreePictureRenderer.submitBlocks(request.snapshot, pose, collector);
+            if (target.getColorTextureView() != null) {
+                try (var frame = Minecraft.getInstance().gameRenderer.featureRenderDispatcher().prepareFrame(collector);
+                     var pass = RenderSystem.getDevice().createCommandEncoder().createRenderPass(() -> "Treefactory thumbnail", target.getColorTextureView(), Optional.empty(), target.getDepthTextureView(), OptionalDouble.empty())) {
+                    RenderSystem.bindDefaultUniforms(pass);
+                    FeatureRenderDispatcher.renderAllFeatures(pass, frame);
+                }
+            }
+            Screenshot.takeScreenshot(target, image -> {
                 target.destroyBuffers();
-                CompletableFuture.runAsync(()-> {
-                    try { image.writeToFile(request.path); }
-                    catch(Exception e) { TreefactoryLight.LOGGER.warn("Thumbnail write failed",e); }
-                }).whenComplete((unused,error)->Minecraft.getInstance().execute(()-> {
-                    if(token!=epoch) image.close(); else register(request.id,image);
+                CompletableFuture.runAsync(() -> {
+                    try {
+                        image.writeToFile(request.path);
+                    } catch (Exception e) {
+                        TreefactoryLight.LOGGER.warn("Thumbnail write failed", e);
+                    }
+                }).whenComplete((unused, error) -> Minecraft.getInstance().execute(() -> {
+                    if (token != epoch) image.close();
+                    else register(request.id, image);
                 }));
             });
-        } catch(Exception e) { target.destroyBuffers(); TreefactoryLight.LOGGER.warn("Thumbnail rendering failed",e); }
-        finally {
+        } catch (Exception e) {
+            target.destroyBuffers();
+            TreefactoryLight.LOGGER.warn("Thumbnail rendering failed", e);
+        } finally {
             RenderSystem.getModelViewStack().popMatrix();
-            if(oldProjection!=null) RenderSystem.setProjectionMatrix(oldProjection,oldType);
-            RenderSystem.setShaderFog(oldFog);
-            projectionBuffer.close();
+            if (oldProjection != null) RenderSystem.setProjectionMatrix(oldProjection, oldType);
+            if (oldFog != null) {
+                RenderSystem.setShaderFog(oldFog);
+            }
         }
     }
     private static void register(String id,NativeImage image) {

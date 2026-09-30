@@ -14,6 +14,8 @@ import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.util.RandomSource;
 import org.joml.Quaternionf;
+import org.jspecify.annotations.NonNull;
+
 import java.util.*;
 
 public final class TreePictureRenderer extends PictureInPictureRenderer<TreePictureRenderer.State> {
@@ -21,10 +23,10 @@ public final class TreePictureRenderer extends PictureInPictureRenderer<TreePict
                         ScreenRectangle scissorArea) implements PictureInPictureRenderState {
         @Override public ScreenRectangle bounds() { return PictureInPictureRenderState.getBounds(x0,y0,x1,y1,scissorArea); }
     }
-    @Override public Class<State> getRenderStateClass() { return State.class; }
-    @Override protected String getTextureLabel() { return "Treefactory tree"; }
+    @Override public @NonNull Class<State> getRenderStateClass() { return State.class; }
+    @Override protected @NonNull String getTextureLabel() { return "Treefactory tree"; }
     @Override protected float getTranslateY(int height,int scale) { return height/2f; }
-    @Override protected void renderToTexture(State state,PoseStack pose,SubmitNodeCollector collector) {
+    @Override protected void renderToTexture(State state, PoseStack pose, @NonNull SubmitNodeCollector collector) {
         pose.rotate(new Quaternionf().rotationZ((float)Math.PI).rotateX((float)Math.toRadians(30)).rotateY(state.angle()));
         pose.translate(0,-state.snapshot.centerY(),0);
         if(state.hologram) collector.submitCustomGeometry(pose,RenderTypes.debugQuads(),(matrix,buffer)->HologramRenderer.draw(state.snapshot,matrix,buffer));
