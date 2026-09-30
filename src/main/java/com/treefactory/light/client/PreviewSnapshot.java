@@ -16,7 +16,8 @@ public record PreviewSnapshot(TreeConfig config, TreeBuildTask.Result tree, List
             Cell c=entry.getKey(); boolean visible=false;
             for(int side=0;side<6;side++) {
                 int[] d=OFFSETS[side];
-                if(!tree.blocks().containsKey(new Cell(c.x()+d[0],c.y()+d[1],c.z()+d[2]))) {
+                var neighbor=tree.blocks().get(new Cell(c.x()+d[0],c.y()+d[1],c.z()+d[2]));
+                if(neighbor==null || entry.getValue()==Voxelizer.Material.LOG && neighbor==Voxelizer.Material.LEAVES) {
                     faces.add(new Face(c,side,entry.getValue()==Voxelizer.Material.LEAVES)); visible=true;
                 }
             }

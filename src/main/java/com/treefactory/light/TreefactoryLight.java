@@ -11,6 +11,8 @@ import net.minecraft.core.Registry;
 import net.minecraft.core.registries.*;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.CreativeModeTabs;
+import net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents;
 
 import net.minecraft.resources.Identifier;
 
@@ -31,6 +33,7 @@ public class TreefactoryLight implements ModInitializer {
 	@Override
 	public void onInitialize() {
 		Registry.register(BuiltInRegistries.ITEM,id("tree_wand"),TREE_WAND);
+		CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.TOOLS_AND_UTILITIES).register(output -> output.accept(TREE_WAND));
 		PayloadTypeRegistry.serverboundPlay().register(C2SBuildTreePacket.TYPE,C2SBuildTreePacket.CODEC);
 		PayloadTypeRegistry.serverboundPlay().register(C2SUndoPacket.TYPE,C2SUndoPacket.CODEC);
 		ServerPlayNetworking.registerGlobalReceiver(C2SBuildTreePacket.TYPE,(packet,context) ->

@@ -14,7 +14,7 @@ public final class PresetCardWidget extends Button {
     public PresetCardWidget(int x,int y,int width,PresetStore.Preset preset,Runnable selected) {
         super(x,y,width,54,Component.literal(preset.name()),button->selected.run(),DEFAULT_NARRATION); this.preset=preset;
     }
-    @Override protected void extractWidgetRenderState(GuiGraphicsExtractor graphics,int mouseX,int mouseY,float delta) {
+    @Override protected void extractContents(GuiGraphicsExtractor graphics,int mouseX,int mouseY,float delta) {
         var state=ClientTreeState.INSTANCE; var font=Minecraft.getInstance().font;
         boolean selected=state.config().equals(preset.config());
         graphics.fill(getX(),getY(),getX()+width,getY()+height,isHovered()?0xFF234A40:0xFF182D27);

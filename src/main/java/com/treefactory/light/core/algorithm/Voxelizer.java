@@ -18,6 +18,7 @@ public final class Voxelizer {
             parents[node.parent()] = true;
             TreeNode parent = nodes.get(node.parent());
             fill(blocks,parent.position(),node.position(),parent.radius(),node.radius(),Material.LOG,cancelled);
+            connectSpine(blocks,parent.position(),node.position());
         }
         if (config.preset() != TreePreset.DEAD && config.fullness()>0) {
             double radius = 1.2+config.fullness()*1.8;
@@ -52,5 +53,20 @@ public final class Voxelizer {
     }
     private static void check(BooleanSupplier cancelled) {
         if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) throw new CancellationException();
+    }
+    /** A radius-0.5 diagonal can miss face-adjacent voxel centres. Keep a connected digital spine. */
+    private static void connectSpine(Map<Cell,Material> blocks,Vector3 a,Vector3 b) {
+        int x=(int)Math.floor(a.x()),y=(int)Math.floor(a.y()),z=(int)Math.floor(a.z());
+        blocks.put(new Cell(x,y,z),Material.LOG);
+        Vector3 delta=b.subtract(a);
+        int steps=Math.max(1,(int)Math.ceil(Math.sqrt(delta.lengthSquared())*4));
+        for(int i=1;i<=steps;i++) {
+            Vector3 p=a.add(delta.multiply(i/(double)steps));
+            int tx=(int)Math.floor(p.x()),ty=(int)Math.floor(p.y()),tz=(int)Math.floor(p.z());
+            while(x!=tx) { x+=Integer.signum(tx-x); blocks.put(new Cell(x,y,z),Material.LOG); }
+            while(y!=ty) { y+=Integer.signum(ty-y); blocks.put(new Cell(x,y,z),Material.LOG); }
+            while(z!=tz) { z+=Integer.signum(tz-z); blocks.put(new Cell(x,y,z),Material.LOG); }
+            if(blocks.size()>MAX_BLOCKS) throw new IllegalArgumentException("Tree exceeds block budget");
+        }
     }
 }

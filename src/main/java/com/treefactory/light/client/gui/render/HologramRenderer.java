@@ -34,7 +34,6 @@ public final class HologramRenderer {
             context.submitNodeCollector().submitCustomGeometry(pose,RenderTypes.debugQuads(),(matrix,buffer)->draw(preview.snapshot,matrix,buffer));
             pose.popPose();
         });
-        LevelRenderEvents.END_MAIN.register(context->ThumbnailFBOMaker.renderPending());
     }
     public static void draw(PreviewSnapshot snapshot,PoseStack.Pose pose,VertexConsumer buffer) {
         for(var face:snapshot.faces()) {

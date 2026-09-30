@@ -25,7 +25,7 @@ public final class TreePictureRenderer extends PictureInPictureRenderer<TreePict
     @Override protected String getTextureLabel() { return "Treefactory tree"; }
     @Override protected float getTranslateY(int height,int scale) { return height/2f; }
     @Override protected void renderToTexture(State state,PoseStack pose,SubmitNodeCollector collector) {
-        pose.rotate(new Quaternionf().rotationX((float)Math.toRadians(30)).rotateY(state.angle()));
+        pose.rotate(new Quaternionf().rotationZ((float)Math.PI).rotateX((float)Math.toRadians(30)).rotateY(state.angle()));
         pose.translate(0,-state.snapshot.centerY(),0);
         if(state.hologram) collector.submitCustomGeometry(pose,RenderTypes.debugQuads(),(matrix,buffer)->HologramRenderer.draw(state.snapshot,matrix,buffer));
         else submitBlocks(state.snapshot,pose,collector);
@@ -39,14 +39,13 @@ public final class TreePictureRenderer extends PictureInPictureRenderer<TreePict
         var models=mc.getModelManager().getBlockStateModelSet();
         models.get(log).collectParts(RandomSource.create(snapshot.config().seed()),logParts);
         models.get(leaves).collectParts(RandomSource.create(snapshot.config().seed()),leafParts);
-        int leafTint=mc.getBlockColors().getColor(leaves,null,null,0);
-        if(leafTint==-1) leafTint=0x77AB43;
-        int[] tint={0xFF000000|leafTint};
+        int[] tint=mc.getBlockColors().getTintSources(leaves).stream().mapToInt(source->source.color(leaves)).toArray();
+        int[] logTint=mc.getBlockColors().getTintSources(log).stream().mapToInt(source->source.color(log)).toArray();
         for(var cell:snapshot.surface()) {
             boolean leaf=snapshot.tree().blocks().get(cell)==Voxelizer.Material.LEAVES;
             pose.pushPose(); pose.translate(cell.x(),cell.y(),cell.z());
             collector.submitBlockModel(pose,leaf?RenderTypes.cutoutMovingBlock():RenderTypes.solidMovingBlock(),
-                    leaf?leafParts:logParts,leaf?tint:new int[0],0xF000F0,OverlayTexture.NO_OVERLAY,0);
+                    leaf?leafParts:logParts,leaf?tint:logTint,0xF000F0,OverlayTexture.NO_OVERLAY,0);
             pose.popPose();
         }
     }

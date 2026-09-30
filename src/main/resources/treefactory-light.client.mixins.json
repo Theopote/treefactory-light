@@ -2,6 +2,6 @@
   "required": true,
   "package": "com.treefactory.light.client.mixin",
   "compatibilityLevel": "JAVA_25",
-  "client": ["WandInputMixin", "WandScrollMixin"],
+  "client": ["WandInputMixin", "WandScrollMixin", "ThumbnailRenderMixin"],
   "injectors": {"defaultRequire": 1}
 }

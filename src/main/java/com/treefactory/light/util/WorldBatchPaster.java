@@ -25,13 +25,20 @@ public final class WorldBatchPaster {
     private final Map<UUID,AtomicBoolean> pending = new HashMap<>();
     private final Deque<Job> jobs = new ArrayDeque<>();
     private final UndoHistory<Edit> history = new UndoHistory<>();
+    private final Map<UUID,Long> nextAction = new HashMap<>();
     private record Change(BlockPos pos, BlockState before, BlockState after) {}
     private record Edit(ResourceKey<Level> dimension, List<Change> changes) {}
     private static final class Job {
-        final UUID player; final ServerLevel level; final Iterator<Change> iterator; final boolean undo;
+        final UUID player; final ServerLevel level; Iterator<Change> iterator; final boolean undo;
+        Iterator<Map.Entry<BlockPos,BlockState>> validation;
+        final List<Change> planned = new ArrayList<>();
         final List<Change> applied = new ArrayList<>();
+        final List<Change> deferred = new ArrayList<>();
         Job(UUID player,ServerLevel level,List<Change> changes,boolean undo) {
             this.player=player; this.level=level; this.iterator=changes.iterator(); this.undo=undo;
+        }
+        Job(UUID player,ServerLevel level,Map<BlockPos,BlockState> blocks) {
+            this(player,level,List.of(),false); this.validation=blocks.entrySet().iterator();
         }
     }
     public static boolean holdingWand(ServerPlayer p) {
@@ -45,6 +52,7 @@ public final class WorldBatchPaster {
         return state;
     }
     public void build(ServerPlayer player, BlockPos origin, TreeConfig config) {
+        if (!acceptAction(player)) return;
         if (!authorized(player)) return;
         UUID id = player.getUUID();
         if (pending.containsKey(id) || jobs.stream().anyMatch(j -> j.player.equals(id))) { message(player,"treefactory.busy"); return; }
@@ -71,19 +79,12 @@ public final class WorldBatchPaster {
                 ServerPlayer current = server.getPlayerList().getPlayer(id);
                 if (current==null || current.level()!=level || !authorized(current)) return;
                 if (error!=null) { TreefactoryLight.LOGGER.warn("Tree generation failed",error); message(current,"treefactory.failed"); return; }
-                List<Change> changes = new ArrayList<>();
-                // Validate the entire footprint before the first write; never generate chunks synchronously.
-                for (var entry : blocks.entrySet()) {
-                    BlockPos pos=entry.getKey();
-                    if (!accessible(level,current,pos)) { message(current,"treefactory.invalid_target"); return; }
-                    BlockState old=level.getBlockState(pos);
-                    if (replaceable(old) && !old.equals(entry.getValue())) changes.add(new Change(pos,old,entry.getValue()));
-                }
-                jobs.addLast(new Job(id,level,changes,false));
+                jobs.addLast(new Job(id,level,blocks));
             });
         });
     }
     public void undo(ServerPlayer player) {
+        if (!acceptAction(player)) return;
         if (!authorized(player)) return;
         UUID id=player.getUUID();
         if (pending.containsKey(id) || jobs.stream().anyMatch(j -> j.player.equals(id))) { message(player,"treefactory.busy"); return; }
@@ -99,27 +100,48 @@ public final class WorldBatchPaster {
         long deadline=System.nanoTime()+4_000_000;
         for (int budget=0; budget<1024 && !jobs.isEmpty() && System.nanoTime()<deadline; budget++) {
             Job job=jobs.removeFirst(); ServerPlayer player=server.getPlayerList().getPlayer(job.player);
-            if (player==null || player.level()!=job.level || !player.isCreative()) { finish(job,player); continue; }
+            if (player==null || player.level()!=job.level || !player.isCreative()) {
+                if (job.undo) job.iterator.forEachRemaining(job.deferred::add);
+                finish(job,player); continue;
+            }
+            // Preflight reads share the tick budget with writes. No world access on worker threads,
+            // no synchronous chunk generation, and no writes until the complete footprint passes.
+            if (job.validation!=null) {
+                if (job.validation.hasNext()) {
+                    var entry=job.validation.next(); BlockPos pos=entry.getKey();
+                    if (!accessible(job.level,player,pos)) { message(player,"treefactory.invalid_target"); continue; }
+                    BlockState old=job.level.getBlockState(pos);
+                    if (replaceable(old) && !old.equals(entry.getValue())) job.planned.add(new Change(pos,old,entry.getValue()));
+                }
+                if (!job.validation.hasNext()) { job.validation=null; job.iterator=job.planned.iterator(); }
+                jobs.addLast(job); continue;
+            }
             if (job.iterator.hasNext()) {
                 Change c=job.iterator.next();
                 if (accessible(job.level,player,c.pos)) {
                     BlockState expected=job.undo?c.after:c.before, target=job.undo?c.before:c.after;
                     if (job.level.getBlockState(c.pos).equals(expected) && job.level.getBlockEntity(c.pos)==null
                             && job.level.setBlock(c.pos,target,FLAGS)) job.applied.add(c);
-                }
+                } else if (job.undo) job.deferred.add(c);
             }
             if (job.iterator.hasNext()) jobs.addLast(job); else finish(job,player);
         }
     }
     private void finish(Job job,ServerPlayer player) {
         if (!job.undo && !job.applied.isEmpty() && player!=null) history.push(job.player,new Edit(job.level.dimension(),List.copyOf(job.applied)));
+        if (job.undo && !job.deferred.isEmpty() && player!=null) history.push(job.player,new Edit(job.level.dimension(),List.copyOf(job.deferred)));
         if (player!=null) player.sendSystemMessage(Component.translatable(job.undo?"treefactory.undone":"treefactory.built",job.applied.size()),false);
     }
     public void disconnect(UUID id) {
         AtomicBoolean flag=pending.remove(id); if(flag!=null) flag.set(true);
-        jobs.removeIf(j -> j.player.equals(id)); history.remove(id);
+        jobs.removeIf(j -> j.player.equals(id)); history.remove(id); nextAction.remove(id);
     }
-    public void stop() { pending.values().forEach(f -> f.set(true)); pending.clear(); jobs.clear(); history.clear(); }
+    public void stop() { pending.values().forEach(f -> f.set(true)); pending.clear(); jobs.clear(); history.clear(); nextAction.clear(); }
+    private boolean acceptAction(ServerPlayer player) {
+        long now=System.nanoTime();
+        if(now<nextAction.getOrDefault(player.getUUID(),0L)) return false;
+        nextAction.put(player.getUUID(),now+500_000_000L); return true;
+    }
     private static boolean accessible(ServerLevel level,ServerPlayer player,BlockPos pos) {
         return !level.isOutsideBuildHeight(pos) && level.getWorldBorder().isWithinBounds(pos)
                 && level.hasChunkAt(pos) && level.mayInteract(player,pos);

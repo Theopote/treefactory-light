@@ -12,6 +12,7 @@ import com.mojang.renderpearl.api.GpuFormat;
 import net.minecraft.client.*;
 import net.minecraft.client.renderer.*;
 import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
+import net.minecraft.client.renderer.fog.FogRenderer;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.Identifier;
 import org.joml.Quaternionf;
@@ -48,15 +49,17 @@ public final class ThumbnailFBOMaker {
         int token=epoch;
         TextureTarget target=new TextureTarget("Treefactory thumbnail",128,128,GpuFormat.RGBA8_UNORM,GpuFormat.D32_FLOAT);
         var oldProjection=RenderSystem.getProjectionMatrixBuffer(); var oldType=RenderSystem.getProjectionType();
+        var oldFog=RenderSystem.getShaderFog();
         ProjectionMatrixBuffer projectionBuffer=new ProjectionMatrixBuffer("Treefactory thumbnail projection");
         RenderSystem.getModelViewStack().pushMatrix().identity();
-        try {
+        try (FogRenderer fog=new FogRenderer()) {
+            RenderSystem.setShaderFog(fog.getBuffer(FogRenderer.FogMode.NONE));
             Projection projection=new Projection(); projection.setupOrtho(-1000,1000,128,128,true);
             RenderSystem.setProjectionMatrix(projectionBuffer.getBuffer(projection),ProjectionType.ORTHOGRAPHIC);
             RenderSystem.getDevice().createCommandEncoder().clearColorAndDepthTextures(target.getColorTexture(),new org.joml.Vector4f(.04f,.08f,.07f,1),target.getDepthTexture(),0);
             PoseStack pose=new PoseStack(); pose.translate(64,64,0);
             float scale=(float)(112/request.snapshot.extent()); pose.scale(scale,scale,-scale);
-            pose.rotate(new Quaternionf().rotationX((float)Math.toRadians(45)).rotateY((float)Math.toRadians(45)));
+            pose.rotate(new Quaternionf().rotationZ((float)Math.PI).rotateX((float)Math.toRadians(45)).rotateY((float)Math.toRadians(45)));
             pose.translate(0,-request.snapshot.centerY(),0);
             SubmitNodeStorage collector=new SubmitNodeStorage();
             TreePictureRenderer.submitBlocks(request.snapshot,pose,collector);
@@ -77,11 +80,12 @@ public final class ThumbnailFBOMaker {
         finally {
             RenderSystem.getModelViewStack().popMatrix();
             if(oldProjection!=null) RenderSystem.setProjectionMatrix(oldProjection,oldType);
+            RenderSystem.setShaderFog(oldFog);
             projectionBuffer.close();
         }
     }
     private static void register(String id,NativeImage image) {
-        Identifier identifier=TreefactoryLight.id("preset/"+id.toLowerCase(Locale.ROOT));
+        Identifier identifier=TreefactoryLight.id("preset/"+UUID.nameUUIDFromBytes(id.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
         Minecraft.getInstance().getTextureManager().register(identifier,new DynamicTexture(()->"Tree preset "+id,image));
         TEXTURES.put(id,identifier);
         while(TEXTURES.size()>64) {

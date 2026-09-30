@@ -62,6 +62,29 @@ class TreeAlgorithmsTest {
         assertThrows(IllegalArgumentException.class,()->TreeConfig.defaults().withDna(.5,1.1,.5));
         assertThrows(IllegalArgumentException.class,()->TreeConfig.defaults().withPalette("../bad","minecraft:oak_leaves"));
     }
+    @Test void extremeDnaAndNegativeSeedsRemainBounded() {
+        for(TreePreset preset:TreePreset.values()) for(int bits=0;bits<8;bits++) {
+            TreeConfig config=TreeConfig.defaults().withPreset(preset).withScale(TreeScale.GIANT).withSeed(-91237)
+                    .withDna(bits&1,(bits>>1)&1,(bits>>2)&1);
+            var result=new TreeBuildTask().build(config,()->false);
+            assertTrue(result.blocks().size()<=Voxelizer.MAX_BLOCKS);
+            assertTrue(result.blocks().containsValue(Voxelizer.Material.LOG));
+            if(config.fullness()==0) assertFalse(result.blocks().containsValue(Voxelizer.Material.LEAVES));
+        }
+    }
+    @Test void generatedLogsFormOneFaceConnectedTree() {
+        for(TreePreset preset:TreePreset.values()) {
+            var blocks=new TreeBuildTask().build(TreeConfig.defaults().withPreset(preset),()->false).blocks();
+            Set<Cell> logs=new HashSet<>(); blocks.forEach((cell,material)->{if(material==Voxelizer.Material.LOG) logs.add(cell);});
+            Deque<Cell> queue=new ArrayDeque<>(); Cell first=logs.iterator().next(); logs.remove(first); queue.add(first);
+            int[][] steps={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
+            while(!queue.isEmpty()) {
+                Cell c=queue.removeFirst();
+                for(int[] d:steps) { Cell n=new Cell(c.x()+d[0],c.y()+d[1],c.z()+d[2]); if(logs.remove(n)) queue.addLast(n); }
+            }
+            assertTrue(logs.isEmpty(),preset+" has disconnected branch voxels");
+        }
+    }
     @Test void perlinNoiseIsContinuousAndSeeded() {
         NoiseGenerator a=new NoiseGenerator(123),b=new NoiseGenerator(123);
         assertEquals(a.sample(.4,.7,.3),b.sample(.4,.7,.3));

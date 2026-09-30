@@ -17,6 +17,7 @@ public final class DrawerScreen extends Screen {
     private final List<AbstractWidget> content=new ArrayList<>(),fixed=new ArrayList<>();
     private int panel,scroll,contentHeight;
     private boolean library;
+    private boolean rotating;
     private String presetName="My tree";
     private float angle=(float)Math.PI/4,zoom=1;
     private static final String[] WOODS={"oak","spruce","birch","jungle","acacia","dark_oak","mangrove","cherry","pale_oak"};
@@ -102,11 +103,16 @@ public final class DrawerScreen extends Screen {
     }
     @Override public boolean mouseClicked(MouseButtonEvent event,boolean doubleClick) {
         if(event.button()==InputConstants.MOUSE_BUTTON_RIGHT && event.hasShiftDown()) { onClose(); return true; }
+        if(event.x()>=panel && event.button()==InputConstants.MOUSE_BUTTON_LEFT) { rotating=true; return true; }
         return super.mouseClicked(event,doubleClick);
     }
     @Override public boolean mouseDragged(MouseButtonEvent event,double dx,double dy) {
-        if(event.x()>=panel && event.button()==InputConstants.MOUSE_BUTTON_LEFT) { angle+=(float)dx*.012f; return true; }
+        if(rotating && event.button()==InputConstants.MOUSE_BUTTON_LEFT) { angle+=(float)dx*.012f; return true; }
         return super.mouseDragged(event,dx,dy);
+    }
+    @Override public boolean mouseReleased(MouseButtonEvent event) {
+        if(rotating && event.button()==InputConstants.MOUSE_BUTTON_LEFT) { rotating=false; return true; }
+        return super.mouseReleased(event);
     }
     @Override public void extractBackground(GuiGraphicsExtractor g,int x,int y,float delta) {}
     @Override public boolean isPauseScreen() { return false; }
