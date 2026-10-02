@@ -30,7 +30,7 @@ public final class TreePictureRenderer extends PictureInPictureRenderer<TreePict
     @Override public @NonNull Class<State> getRenderStateClass() { return State.class; }
     @Override protected @NonNull String getTextureLabel() { return "Treefactory tree"; }
     @Override protected float getTranslateY(int height,int scale) { return height/2f; }
-    @Override protected void renderToTexture(State state, PoseStack pose, @NonNull SubmitNodeCollector collector) {
+    @Override protected void renderToTexture(State state, @NonNull PoseStack pose, @NonNull SubmitNodeCollector collector) {
         orient(pose,state.angle());
         pose.translate(0,-state.snapshot.centerY(),0);
         if(state.hologram) collector.submitCustomGeometry(pose,RenderTypes.debugQuads(),(matrix,buffer)->HologramRenderer.draw(state.snapshot,matrix,buffer));

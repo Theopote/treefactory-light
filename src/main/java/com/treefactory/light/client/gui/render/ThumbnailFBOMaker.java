@@ -98,6 +98,7 @@ public final class ThumbnailFBOMaker {
                 target.destroyBuffers();
                 CompletableFuture.runAsync(() -> {
                     try {
+                        Files.createDirectories(request.path.getParent());
                         image.writeToFile(request.path);
                     } catch (Exception e) {
                         TreefactoryLight.LOGGER.warn("Thumbnail write failed", e);

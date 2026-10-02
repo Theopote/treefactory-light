@@ -26,19 +26,24 @@ public final class ClientTreeState {
     private long changedAt=System.nanoTime();
     private boolean dirty=true, generating;
     private BlockPos lockedOrigin;
-    private List<PresetStore.Preset> presets=List.of();
+    private static final List<PresetStore.Preset> BUILT_IN_PRESETS=Arrays.stream(TreePreset.values())
+            .map(type->new PresetStore.Preset("builtin-"+type.id(),type.id(),"Treefactory Light",
+                    TreeConfig.defaults().withPreset(type)))
+            .toList();
+    private List<PresetStore.Preset> presets=BUILT_IN_PRESETS;
     private String status="";
     private long lastAction;
     public TreeConfig config() { return config; }
     public PreviewSnapshot preview() { return preview!=null && preview.config().equals(config)?preview:null; }
     public List<PresetStore.Preset> presets() { return presets; }
     public String status() { return status; }
-    public void update(TreeConfig next) {
-        if(config.equals(next)) return;
+    public boolean update(TreeConfig next) {
+        if(config.equals(next)) return true;
         // Imported presets may reference missing blocks or blocks outside the allowed palette.
         try { WorldBatchPaster.palette(next); }
-        catch(IllegalArgumentException e) { toast("treefactory.invalid_palette"); return; }
+        catch(IllegalArgumentException e) { toast("treefactory.invalid_palette"); return false; }
         config=next; revision.incrementAndGet(); dirty=true; changedAt=System.nanoTime();
+        return true;
     }
     public boolean holdingWand() {
         var p=Minecraft.getInstance().player;
@@ -91,7 +96,10 @@ public final class ClientTreeState {
             try { return store.loadAll(warning->TreefactoryLight.LOGGER.warn("Invalid preset: {}",warning)); }
             catch(Exception e) { throw new CompletionException(e); }
         }).whenComplete((list,error)->Minecraft.getInstance().execute(()-> {
-            if(error==null) presets=list;
+            if(error==null) {
+                List<PresetStore.Preset> combined=new ArrayList<>(BUILT_IN_PRESETS);
+                combined.addAll(list); presets=List.copyOf(combined);
+            }
             else { status=Component.translatable("treefactory.load_failed").getString(); TreefactoryLight.LOGGER.warn("Preset loading failed",error); }
             if(Minecraft.getInstance().gui.screen() instanceof DrawerScreen drawer) drawer.refresh();
         }));
@@ -110,7 +118,7 @@ public final class ClientTreeState {
         }));
     }
     public void disconnect() {
-        revision.incrementAndGet(); preview=null; dirty=true; lockedOrigin=null; presets=List.of();
+        revision.incrementAndGet(); preview=null; dirty=true; lockedOrigin=null; presets=BUILT_IN_PRESETS;
         ThumbnailFBOMaker.clear();
     }
     public static void toast(String key) {

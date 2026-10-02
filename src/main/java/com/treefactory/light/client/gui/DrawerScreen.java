@@ -19,7 +19,7 @@ public final class DrawerScreen extends Screen {
     private final List<AbstractWidget> content=new ArrayList<>(),fixed=new ArrayList<>();
     private int panel,scroll,contentHeight;
     private boolean library;
-    private enum Panel { NONE, PRESETS, SHAPES, MATERIALS }
+    private enum Panel { NONE, SHAPES, MATERIALS }
     private Panel expanded=Panel.NONE;
     private boolean rotating;
     private String presetName="My tree";
@@ -42,24 +42,19 @@ public final class DrawerScreen extends Screen {
         fixed.add(addWidget(button(8,height-24,(panel-20)/2,"treefactory.undo",state::undo)));
         fixed.add(addWidget(button(12+(panel-20)/2,height-24,(panel-20)/2,"gui.done",this::onClose)));
         if(library) {
-            int y=54;
-            for(var preset:state.presets()) {
-                addContent(new PresetCardWidget(8,y-scroll,panel-16,preset,()->{state.update(preset.config());refresh();})); y+=60;
+            int gap=6, tile=Math.max(1,Math.min((panel-16-gap)/2,height-108)), y=54;
+            List<PresetStore.Preset> presets=state.presets();
+            contentHeight=Math.max(tile,((presets.size()+1)/2)*(tile+gap));
+            scroll=Math.clamp(scroll,0,Math.max(0,contentHeight-(height-106)));
+            for(int i=0;i<presets.size();i++) {
+                var preset=presets.get(i);
+                int x=8+(i%2)*(tile+gap), top=y+(i/2)*(tile+gap)-scroll;
+                addContent(new PresetCardWidget(x,top,tile,preset,()->{
+                    if(state.update(preset.config())) { library=false; expanded=Panel.NONE; scroll=0; refresh(); }
+                }));
             }
-            contentHeight=Math.max(60,y-54);
         } else {
             TreeConfig c=state.config(); int y=54;
-            Button presets=button(8,y-scroll,panel-16,"treefactory.choose_preset",()->toggle(Panel.PRESETS));
-            presets.setMessage(Component.translatable("treefactory.choose_preset").append(": ")
-                    .append(Component.translatable("treefactory.preset."+c.preset().id())).append(expanded==Panel.PRESETS?" ▲":" ▼"));
-            addContent(presets); y+=23;
-            if(expanded==Panel.PRESETS) for(TreePreset preset:TreePreset.values()) {
-                Button choice=button(16,y-scroll,panel-24,"treefactory.preset."+preset.id(),()->{
-                    state.update(state.config().withPreset(preset)); expanded=Panel.NONE; refresh();
-                });
-                if(c.preset()==preset) choice.setMessage(Component.literal("✓ ").append(choice.getMessage()));
-                addContent(choice); y+=23;
-            }
             addContent(button(8,y-scroll,panel-16,"treefactory.scale."+c.scale().id(),()->{state.cycleScale(1);refresh();})); y+=28;
             addContent(new DNAControlSlider(8,y-scroll,panel-16,"treefactory.crookedness",c.crookedness(),v->state.update(state.config().withDna(v,state.config().spread(),state.config().fullness())))); y+=25;
             addContent(new DNAControlSlider(8,y-scroll,panel-16,"treefactory.spread",c.spread(),v->state.update(state.config().withDna(state.config().crookedness(),v,state.config().fullness())))); y+=25;
@@ -118,6 +113,15 @@ public final class DrawerScreen extends Screen {
             name.setMaxLength(64); name.setValue(presetName); name.setResponder(value->presetName=value); addContent(name); y+=23;
             addContent(button(8,y-scroll,panel-16,"treefactory.save",()->state.save(presetName))); y+=24;
             contentHeight=y-54;
+        }
+        int bounded=Math.clamp(scroll,0,Math.max(0,contentHeight-(height-106)));
+        if(bounded!=scroll) {
+            int shift=scroll-bounded;
+            for(AbstractWidget widget:content) {
+                widget.setY(widget.getY()+shift);
+                widget.visible=widget.getY()>=50 && widget.getY()+widget.getHeight()<=height-52;
+            }
+            scroll=bounded;
         }
     }
     private void addContent(AbstractWidget widget) {
