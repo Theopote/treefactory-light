@@ -24,8 +24,9 @@ import java.util.concurrent.*;
 public final class ThumbnailFBOMaker {
     private record Request(String id,PreviewSnapshot snapshot,Path path) {}
     private static final Queue<Request> PENDING=new ArrayDeque<>();
-    private static final Map<String,Identifier> TEXTURES=new LinkedHashMap<>();
+    private static final Map<String,Identifier> TEXTURES=new LinkedHashMap<>(16,.75f,true);
     private static final Set<String> LOADING=new HashSet<>();
+    private static final Set<String> MISSING=new HashSet<>();
     private static final Set<String> QUEUED=new HashSet<>();
     private static final Set<String> BUILDING=new HashSet<>();
     private static final Set<String> FAILED=new HashSet<>();
@@ -34,7 +35,7 @@ public final class ThumbnailFBOMaker {
         if(PENDING.size()<16 && QUEUED.add(preset.id())) PENDING.add(new Request(preset.id(),snapshot,path));
     }
     public static void ensure(PresetStore.Preset preset,PreviewSnapshot snapshot,Path path) {
-        if(Files.isRegularFile(path) || TEXTURES.containsKey(preset.id()) || QUEUED.contains(preset.id())
+        if(!MISSING.contains(preset.id()) || TEXTURES.containsKey(preset.id()) || QUEUED.contains(preset.id())
                 || BUILDING.contains(preset.id()) || FAILED.contains(preset.id())) return;
         if(snapshot!=null && snapshot.config().equals(preset.config())) { enqueue(preset,snapshot,path); return; }
         if(BUILDING.size()>=2) return;
@@ -49,14 +50,25 @@ public final class ThumbnailFBOMaker {
     }
     public static Identifier texture(String id,Path path) {
         Identifier texture=TEXTURES.get(id);
-        if(texture==null && !Files.isRegularFile(path)) return null;
-        if(texture!=null || !LOADING.add(id)) return texture;
+        if(texture!=null || MISSING.contains(id) || FAILED.contains(id) || QUEUED.contains(id) || !LOADING.add(id)) return texture;
         int token=epoch;
         CompletableFuture.supplyAsync(()-> {
-            try { return Files.isRegularFile(path) && Files.size(path)<2_000_000 ? NativeImage.read(Files.readAllBytes(path)) : null; }
-            catch(Exception e) { TreefactoryLight.LOGGER.warn("Thumbnail read failed: {}",path,e); return null; }
+            try {
+                if(!Files.isRegularFile(path)) return null;
+                if(Files.size(path)>=2_000_000) throw new IllegalArgumentException("Thumbnail file is too large");
+                NativeImage image=NativeImage.read(Files.readAllBytes(path));
+                if(image.getWidth()!=128 || image.getHeight()!=128) {
+                    image.close(); throw new IllegalArgumentException("Thumbnail dimensions are invalid");
+                }
+                return image;
+            }
+            catch(Exception e) {
+                TreefactoryLight.LOGGER.warn("Thumbnail read failed, regenerating: {}",path,e);
+                try { Files.deleteIfExists(path); } catch(Exception cleanup) { TreefactoryLight.LOGGER.warn("Could not remove damaged thumbnail: {}",path,cleanup); }
+                return null;
+            }
         }).thenAccept(image->Minecraft.getInstance().execute(()-> {
-            if(image==null) { LOADING.remove(id); return; }
+            if(image==null) { if(token==epoch) MISSING.add(id); LOADING.remove(id); return; }
             if(token!=epoch) { image.close(); LOADING.remove(id); return; }
             register(id,image);
         }));
@@ -125,13 +137,14 @@ public final class ThumbnailFBOMaker {
         Identifier identifier=TreefactoryLight.id("preset/"+UUID.nameUUIDFromBytes(id.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
         Minecraft.getInstance().getTextureManager().register(identifier,new DynamicTexture(()->"Tree preset "+id,image));
         TEXTURES.put(id,identifier);
+        MISSING.remove(id); LOADING.remove(id);
         while(TEXTURES.size()>64) {
             String oldest=TEXTURES.keySet().iterator().next();
             Minecraft.getInstance().getTextureManager().release(TEXTURES.remove(oldest)); LOADING.remove(oldest);
         }
     }
     public static void clear() {
-        epoch++; PENDING.clear(); LOADING.clear(); QUEUED.clear(); BUILDING.clear(); FAILED.clear();
+        epoch++; PENDING.clear(); LOADING.clear(); MISSING.clear(); QUEUED.clear(); BUILDING.clear(); FAILED.clear();
         TEXTURES.values().forEach(id->Minecraft.getInstance().getTextureManager().release(id)); TEXTURES.clear();
     }
 }

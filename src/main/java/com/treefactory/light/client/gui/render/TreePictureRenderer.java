@@ -40,21 +40,22 @@ public final class TreePictureRenderer extends PictureInPictureRenderer<TreePict
     public static void submitBlocks(PreviewSnapshot snapshot,PoseStack pose,SubmitNodeCollector collector) {
         Minecraft mc=Minecraft.getInstance();
         var palette=WorldBatchPaster.palette(snapshot.config());
-        EnumMap<Voxelizer.Material,List<BlockStateModelPart>> parts=new EnumMap<>(Voxelizer.Material.class);
-        EnumMap<Voxelizer.Material,int[]> tints=new EnumMap<>(Voxelizer.Material.class);
+        Map<net.minecraft.world.level.block.state.BlockState,List<BlockStateModelPart>> parts=new HashMap<>();
+        Map<net.minecraft.world.level.block.state.BlockState,int[]> tints=new HashMap<>();
         var models=mc.getModelManager().getBlockStateModelSet();
-        for(var material:Voxelizer.Material.values()) {
-            var block=palette.get(material);
-            List<BlockStateModelPart> modelParts=new ArrayList<>();
-            models.get(block).collectParts(RandomSource.create(snapshot.config().seed()),modelParts);
-            parts.put(material,modelParts);
-            tints.put(material,mc.getBlockColors().getTintSources(block).stream().mapToInt(source->source.color(block)).toArray());
-        }
         for(var cell:snapshot.surface()) {
             var material=snapshot.tree().blocks().get(cell);
+            var block=WorldBatchPaster.orient(palette.get(material),snapshot.tree().axes().get(cell));
+            var modelParts=parts.computeIfAbsent(block,state->{
+                List<BlockStateModelPart> value=new ArrayList<>();
+                models.get(state).collectParts(RandomSource.create(snapshot.config().seed()),value);
+                return value;
+            });
+            var tint=tints.computeIfAbsent(block,state->mc.getBlockColors().getTintSources(state)
+                    .stream().mapToInt(source->source.color(state)).toArray());
             pose.pushPose(); pose.translate(cell.x(),cell.y(),cell.z());
             collector.submitBlockModel(pose,material.woody()?RenderTypes.solidMovingBlock():RenderTypes.cutoutMovingBlock(),
-                    parts.get(material),tints.get(material),0xF000F0,OverlayTexture.NO_OVERLAY,0);
+                    modelParts,tint,0xF000F0,OverlayTexture.NO_OVERLAY,0);
             pose.popPose();
         }
     }

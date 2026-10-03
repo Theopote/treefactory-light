@@ -18,13 +18,14 @@ public abstract class WandInputMixin {
     @Inject(method="startAttack",at=@At("HEAD"),cancellable=true)
     private void treefactory$undo(CallbackInfoReturnable<Boolean> ci) {
         Minecraft mc=Minecraft.getInstance();
-        if(ClientTreeState.INSTANCE.holdingWand() && mc.player.isShiftKeyDown()) {
-            ClientTreeState.INSTANCE.undo(); ci.setReturnValue(false);
+        if(ClientTreeState.INSTANCE.holdingWand()) {
+            if(mc.player.isShiftKeyDown()) ClientTreeState.INSTANCE.undo();
+            ci.setReturnValue(false);
         }
     }
     @Inject(method="continueAttack",at=@At("HEAD"),cancellable=true)
     private void treefactory$preventMining(boolean attacking,CallbackInfo ci) {
         Minecraft mc=Minecraft.getInstance();
-        if(ClientTreeState.INSTANCE.holdingWand() && mc.player.isShiftKeyDown()) ci.cancel();
+        if(ClientTreeState.INSTANCE.holdingWand()) ci.cancel();
     }
 }

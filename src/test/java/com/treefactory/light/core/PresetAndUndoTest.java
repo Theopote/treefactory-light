@@ -3,6 +3,7 @@ package com.treefactory.light.core;
 import com.treefactory.light.core.config.*;
 import com.treefactory.light.util.UndoHistory;
 import java.nio.file.*;
+import java.nio.file.attribute.FileTime;
 import java.util.*;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -33,6 +34,14 @@ class PresetAndUndoTest {
         var loaded=PresetStore.decode("legacy",root.toString()).config();
         assertEquals(TreeConfig.defaults(),loaded);
     }
+    @Test void recentlyModifiedPresetsAppearFirst() throws Exception {
+        PresetStore store=new PresetStore(directory);
+        var older=store.save("Older","Player",TreeConfig.defaults());
+        var newer=store.save("Newer","Player",TreeConfig.defaults());
+        Files.setLastModifiedTime(directory.resolve(older.id()+".json"),FileTime.fromMillis(1_000));
+        Files.setLastModifiedTime(directory.resolve(newer.id()+".json"),FileTime.fromMillis(2_000));
+        assertEquals(List.of(newer,older),store.loadAll(warning->fail(warning)));
+    }
     @Test void historyIsBoundedLifoAndIsolatedByPlayer() {
         UndoHistory<Integer> history=new UndoHistory<>(); UUID a=UUID.randomUUID(),b=UUID.randomUUID();
         for(int i=0;i<8;i++) history.push(a,i);
@@ -40,5 +49,14 @@ class PresetAndUndoTest {
         for(int i=7;i>=3;i--) assertEquals(Integer.valueOf(i),history.pop(a));
         assertNull(history.pop(a)); assertEquals(Integer.valueOf(99),history.pop(b));
         history.push(a,1); history.remove(a); assertNull(history.peek(a));
+    }
+    @Test void historyEvictsOldestAcrossPlayersWhenGlobalBudgetIsReached() {
+        UndoHistory<String> history=new UndoHistory<>(3,String::length);
+        UUID a=UUID.randomUUID(),b=UUID.randomUUID();
+        history.push(a,"aa"); history.push(b,"b"); history.push(a,"aa");
+        assertEquals("aa",history.pop(a));
+        assertNull(history.pop(a));
+        assertEquals("b",history.pop(b));
+        assertThrows(IllegalArgumentException.class,()->history.push(a,"long"));
     }
 }

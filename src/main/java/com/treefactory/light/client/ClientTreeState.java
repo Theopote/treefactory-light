@@ -11,6 +11,7 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.phys.*;
 import java.util.*;
@@ -33,6 +34,7 @@ public final class ClientTreeState {
     private List<PresetStore.Preset> presets=BUILT_IN_PRESETS;
     private String status="";
     private long lastAction;
+    private boolean hasAction;
     public TreeConfig config() { return config; }
     public PreviewSnapshot preview() { return preview!=null && preview.config().equals(config)?preview:null; }
     public List<PresetStore.Preset> presets() { return presets; }
@@ -47,12 +49,15 @@ public final class ClientTreeState {
     }
     public boolean holdingWand() {
         var p=Minecraft.getInstance().player;
-        return p!=null && (p.getMainHandItem().is(TreefactoryLight.TREE_WAND)||p.getOffhandItem().is(TreefactoryLight.TREE_WAND));
+        return p!=null && p.getMainHandItem().is(TreefactoryLight.TREE_WAND);
     }
     public BlockPos origin() {
         if(Minecraft.getInstance().gui.screen() instanceof DrawerScreen) return lockedOrigin;
         var hit=Minecraft.getInstance().hitResult;
-        return hit instanceof BlockHitResult block && hit.getType()==HitResult.Type.BLOCK ? block.getBlockPos().relative(block.getDirection()) : null;
+        if(!(hit instanceof BlockHitResult block) || hit.getType()!=HitResult.Type.BLOCK
+                || block.getDirection()!=Direction.UP || Minecraft.getInstance().level==null) return null;
+        BlockPos clicked=block.getBlockPos();
+        return Minecraft.getInstance().level.getBlockState(clicked).canBeReplaced() ? clicked : clicked.above();
     }
     public void open() {
         Minecraft mc=Minecraft.getInstance();
@@ -70,7 +75,8 @@ public final class ClientTreeState {
                     generating=false;
                     if(revision.get()!=token) return;
                     if(error!=null) { status=Component.translatable("treefactory.failed").getString(); TreefactoryLight.LOGGER.warn("Preview failed",error); }
-                    else { preview=result; status=Component.translatable("treefactory.preview_count",result.tree().blocks().size()).getString(); }
+                    else { preview=result; status=Component.translatable("treefactory.preview_count",
+                            result.tree().blocks().size(),result.blockWidth(),result.blockHeight(),result.blockDepth()).getString(); }
                 }));
     }
     public void build() {
@@ -85,7 +91,11 @@ public final class ClientTreeState {
         if(ClientPlayNetworking.canSend(C2SUndoPacket.TYPE)) ClientPlayNetworking.send(new C2SUndoPacket());
         else toast("treefactory.no_server");
     }
-    private boolean throttle() { long now=System.nanoTime(); if(now-lastAction<250_000_000L) return false; lastAction=now; return true; }
+    private boolean throttle() {
+        long now=System.nanoTime();
+        if(hasAction && now-lastAction<250_000_000L) return false;
+        lastAction=now; hasAction=true; return true;
+    }
     public void cycleScale(int direction) {
         update(config.withScale(config.scale().cycle(direction)));
         var player=Minecraft.getInstance().player;
@@ -119,6 +129,7 @@ public final class ClientTreeState {
     }
     public void disconnect() {
         revision.incrementAndGet(); preview=null; dirty=true; lockedOrigin=null; presets=BUILT_IN_PRESETS;
+        hasAction=false;
         ThumbnailFBOMaker.clear();
     }
     public static void toast(String key) {

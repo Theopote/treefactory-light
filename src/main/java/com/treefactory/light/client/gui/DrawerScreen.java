@@ -119,14 +119,17 @@ public final class DrawerScreen extends Screen {
             int shift=scroll-bounded;
             for(AbstractWidget widget:content) {
                 widget.setY(widget.getY()+shift);
-                widget.visible=widget.getY()>=50 && widget.getY()+widget.getHeight()<=height-52;
+                widget.visible=inContentViewport(widget);
             }
             scroll=bounded;
         }
     }
     private void addContent(AbstractWidget widget) {
-        widget.visible=widget.getY()>=50 && widget.getY()+widget.getHeight()<=height-52;
+        widget.visible=inContentViewport(widget);
         content.add(addWidget(widget));
+    }
+    private boolean inContentViewport(AbstractWidget widget) {
+        return widget.getY()<height-51 && widget.getY()+widget.getHeight()>50;
     }
     private Button button(int x,int y,int width,String key,Runnable action) {
         return Button.builder(Component.translatable(key),b->action.run()).bounds(x,y,width,20).build();
@@ -175,7 +178,13 @@ public final class DrawerScreen extends Screen {
     }
     @Override public boolean mouseScrolled(double x,double y,double horizontal,double vertical) {
         if(x<panel && y>=50 && y<height-51) {
-            scroll=Math.clamp(scroll-(int)(vertical*24),0,Math.max(0,contentHeight-(height-106))); refresh(); return true;
+            int next=Math.clamp(scroll-(int)(vertical*24),0,Math.max(0,contentHeight-(height-106)));
+            int shift=scroll-next;
+            for(AbstractWidget widget:content) {
+                widget.setY(widget.getY()+shift);
+                widget.visible=inContentViewport(widget);
+            }
+            scroll=next; return true;
         }
         if(x>=panel) { zoom=Math.clamp(zoom+(float)vertical*.08f,.35f,2); return true; }
         return super.mouseScrolled(x,y,horizontal,vertical);

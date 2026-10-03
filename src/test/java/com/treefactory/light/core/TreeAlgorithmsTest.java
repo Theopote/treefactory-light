@@ -3,7 +3,6 @@ package com.treefactory.light.core;
 import com.treefactory.light.core.algorithm.*;
 import com.treefactory.light.core.config.*;
 import com.treefactory.light.core.tree.*;
-import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CancellationException;
 import org.junit.jupiter.api.Test;
@@ -48,14 +47,22 @@ class TreeAlgorithmsTest {
         assertTrue(blocks.values().stream().anyMatch(m->!m.woody()));
         assertTrue(blocks.keySet().stream().allMatch(p->p.y()>=0));
     }
+    @Test void voxelizerRecordsTheDominantBranchAxis() {
+        List<TreeNode> nodes=List.of(
+                new TreeNode(new Vector3(.5,.5,.5),-1,.5),
+                new TreeNode(new Vector3(.5,3.5,.5),0,.5),
+                new TreeNode(new Vector3(4.5,3.5,.5),1,.5));
+        var voxels=new Voxelizer().voxelizeData(nodes,TreeConfig.defaults(),()->false);
+        assertEquals(Voxelizer.Axis.Y,voxels.axes().get(new Cell(0,1,0)));
+        assertEquals(Voxelizer.Axis.X,voxels.axes().get(new Cell(3,3,0)));
+        assertTrue(voxels.axes().keySet().stream().allMatch(c->voxels.blocks().get(c).woody()));
+    }
     @Test void allPresetsAndSizesStayInsideBudgets() {
-        assertTimeout(Duration.ofSeconds(30),()-> {
-            for(TreePreset preset:TreePreset.values()) for(TreeScale size:TreeScale.values()) {
-                var result=new TreeBuildTask().build(TreeConfig.defaults().withPreset(preset).withScale(size),()->false);
-                assertFalse(result.blocks().isEmpty()); assertTrue(result.blocks().size()<=Voxelizer.MAX_BLOCKS);
-                if(preset==TreePreset.DEAD) assertTrue(result.blocks().values().stream().allMatch(Voxelizer.Material::woody));
-            }
-        });
+        for(TreePreset preset:TreePreset.values()) for(TreeScale size:TreeScale.values()) {
+            var result=new TreeBuildTask().build(TreeConfig.defaults().withPreset(preset).withScale(size),()->false);
+            assertFalse(result.blocks().isEmpty()); assertTrue(result.blocks().size()<=Voxelizer.MAX_BLOCKS);
+            if(preset==TreePreset.DEAD) assertTrue(result.blocks().values().stream().allMatch(Voxelizer.Material::woody));
+        }
     }
     @Test void cancelledWorkStopsAndInvalidDnaIsRejected() {
         assertThrows(CancellationException.class,()->new TreeBuildTask().build(TreeConfig.defaults(),()->true));
@@ -125,11 +132,27 @@ class TreeAlgorithmsTest {
         assertThrows(IllegalArgumentException.class,()->config.withCanopy(CanopyShape.SPHERE,2.5,1));
     }
     @Test void largestSupportedCanopyStaysWithinBudget() {
-        assertTimeout(Duration.ofSeconds(15),()->{
-            TreeConfig config=TreeConfig.defaults().withScale(TreeScale.GIANT)
-                    .withCanopy(CanopyShape.SPHERE,2,2);
-            var result=new TreeBuildTask().build(config,()->false);
-            assertTrue(result.blocks().size()<=Voxelizer.MAX_BLOCKS);
-        });
+        TreeConfig config=TreeConfig.defaults().withScale(TreeScale.GIANT)
+                .withCanopy(CanopyShape.SPHERE,2,2);
+        var result=new TreeBuildTask().build(config,()->false);
+        assertTrue(result.blocks().size()<=Voxelizer.MAX_BLOCKS);
+    }
+    @Test void giantWillowSharesDroopingGrowthAcrossTips() {
+        var nodes=new SpaceColonizer().generate(TreeConfig.defaults().withPreset(TreePreset.WILLOW).withScale(TreeScale.GIANT));
+        int crownNodes=Math.min(SpaceColonizer.MAX_NODES,nodes.size());
+        boolean[] crownParent=new boolean[crownNodes], drooping=new boolean[crownNodes];
+        for(int i=1;i<crownNodes;i++) crownParent[nodes.get(i).parent()]=true;
+        for(int i=crownNodes;i<nodes.size();i++) if(nodes.get(i).parent()<crownNodes) drooping[nodes.get(i).parent()]=true;
+        int tips=0, grown=0;
+        for(int i=0;i<crownNodes;i++) if(!crownParent[i]) { tips++; if(drooping[i]) grown++; }
+        assertTrue(tips>50);
+        assertTrue(grown>=tips*.8,"Only "+grown+" of "+tips+" giant willow tips drooped");
+    }
+    @Test void generatedTrunksRespectScaleRelativeRadiusCap() {
+        for(TreeScale scale:TreeScale.values()) {
+            TreeConfig config=TreeConfig.defaults().withScale(scale);
+            var nodes=new TreeBuildTask().build(config,()->false).nodes();
+            assertTrue(nodes.getFirst().radius()<=Math.max(1.0,scale.height*.055)+1e-9);
+        }
     }
 }

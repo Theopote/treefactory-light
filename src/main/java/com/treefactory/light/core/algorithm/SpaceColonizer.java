@@ -8,6 +8,7 @@ import java.util.function.BooleanSupplier;
 
 public final class SpaceColonizer {
     public static final int MAX_NODES = 1800;
+    public static final int MAX_WILLOW_NODES = 3600;
     public static final int MAX_ITERATIONS = 160;
 
     public List<TreeNode> generate(TreeConfig config) { return generate(config, () -> false); }
@@ -85,12 +86,18 @@ public final class SpaceColonizer {
             boolean[] parent = new boolean[nodes.size()];
             for (TreeNode n : nodes) if (n.parent() >= 0) parent[n.parent()] = true;
             int before = nodes.size();
-            for (int i=0; i<before && nodes.size()<MAX_NODES; i++) if (!parent[i]) {
-                int last = i;
-                for (int k=0; k<height*.16 && nodes.size()<MAX_NODES; k++) {
-                    Vector3 p = nodes.get(last).position().add(new Vector3(0,-1,0));
-                    if (p.y()<1 || !occupied.add(quantize(p))) break;
-                    nodes.add(new TreeNode(p,last,.5)); last = nodes.size()-1;
+            List<Integer> tips=new ArrayList<>();
+            for(int i=0;i<before;i++) if(!parent[i]) tips.add(i);
+            // Grow all drooping tips one level at a time. A saturated crown must not
+            // give all remaining nodes to the first tips in list order.
+            int length=(int)Math.ceil(height*.16);
+            for(int step=0;step<length && nodes.size()<MAX_WILLOW_NODES;step++) {
+                for(int i=0;i<tips.size() && nodes.size()<MAX_WILLOW_NODES;i++) {
+                    int last=tips.get(i);
+                    if(last<0) continue;
+                    Vector3 p=nodes.get(last).position().add(new Vector3(0,-1,0));
+                    if(p.y()<1 || !occupied.add(quantize(p))) { tips.set(i,-1); continue; }
+                    nodes.add(new TreeNode(p,last,.5)); tips.set(i,nodes.size()-1);
                 }
             }
         }

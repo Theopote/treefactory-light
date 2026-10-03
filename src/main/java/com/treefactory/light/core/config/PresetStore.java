@@ -32,7 +32,10 @@ public final class PresetStore {
         if (!Files.isDirectory(directory)) return List.of();
         List<Preset> presets = new ArrayList<>();
         try (var files = Files.list(directory)) {
-            for (Path path : files.filter(p -> p.getFileName().toString().endsWith(".json")).sorted().limit(256).toList()) {
+            List<Path> paths=new ArrayList<>(files.filter(p -> p.getFileName().toString().endsWith(".json")).toList());
+            paths.sort(Comparator.comparingLong(PresetStore::modified).reversed());
+            if(paths.size()>256) warning.accept("Showing the 256 most recently modified presets of "+paths.size());
+            for (Path path : paths.stream().limit(256).toList()) {
                 try {
                     if (Files.size(path)>16384) throw new IllegalArgumentException("File too large");
                     String file = path.getFileName().toString();
@@ -43,6 +46,10 @@ public final class PresetStore {
             }
         }
         return List.copyOf(presets);
+    }
+    private static long modified(Path path) {
+        try { return Files.getLastModifiedTime(path).toMillis(); }
+        catch(IOException e) { return Long.MIN_VALUE; }
     }
     public static String encode(String name, String author, TreeConfig c) {
         JsonObject root = new JsonObject();

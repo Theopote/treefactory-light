@@ -38,10 +38,6 @@ src/main/
 客户端代码虽然属于同一源集，仍通过 `fabric.mod.json` 的 `client` 入口初始化；
 公共入口和服务端逻辑不得引用客户端专用类。单元测试位于 `src/test/java/`。
 
-## Setup
+## 许可证
 
-For setup instructions, please see the [Fabric Documentation page](https://docs.fabricmc.net/develop/getting-started/creating-a-project#setting-up) related to the IDE that you are using.
-
-## License
-
-This template is available under the CC0 license. Feel free to learn from it and incorporate it in your own projects.
+见 [LICENSE](LICENSE)。

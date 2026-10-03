@@ -24,7 +24,7 @@ public final class WorldBatchPaster {
     private static final int FLAGS = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE; // 2 | 16
     private final Map<UUID,AtomicBoolean> pending = new HashMap<>();
     private final Deque<Job> jobs = new ArrayDeque<>();
-    private final UndoHistory<Edit> history = new UndoHistory<>();
+    private final UndoHistory<Edit> history = new UndoHistory<>(400_000,edit->edit.changes.size());
     private final Map<UUID,Long> nextAction = new HashMap<>();
     private record Change(BlockPos pos, BlockState before, BlockState after) {}
     private record Edit(ResourceKey<Level> dimension, List<Change> changes) {}
@@ -42,7 +42,7 @@ public final class WorldBatchPaster {
         }
     }
     public static boolean holdingWand(ServerPlayer p) {
-        return p.getMainHandItem().is(TreefactoryLight.TREE_WAND) || p.getOffhandItem().is(TreefactoryLight.TREE_WAND);
+        return p.getMainHandItem().is(TreefactoryLight.TREE_WAND);
     }
     public static BlockState palette(String id, boolean leaves) {
         Block block = BuiltInRegistries.BLOCK.getOptional(Identifier.parse(id)).orElseThrow(() -> new IllegalArgumentException("Unknown block: "+id));
@@ -61,6 +61,13 @@ public final class WorldBatchPaster {
         result.put(Voxelizer.Material.SECONDARY_LEAF,palette(p.secondaryLeaf(),true));
         result.put(Voxelizer.Material.ACCENT,accent(p.accentBlock()));
         return result;
+    }
+    public static BlockState orient(BlockState state,Voxelizer.Axis axis) {
+        if(axis==null || !state.hasProperty(BlockStateProperties.AXIS)) return state;
+        Direction.Axis direction=switch(axis) {
+            case X -> Direction.Axis.X; case Y -> Direction.Axis.Y; case Z -> Direction.Axis.Z;
+        };
+        return state.setValue(BlockStateProperties.AXIS,direction);
     }
     private static BlockState choice(String id,net.minecraft.tags.TagKey<Block> tag) {
         BlockState state=BuiltInRegistries.BLOCK.getOptional(Identifier.parse(id))
@@ -83,8 +90,11 @@ public final class WorldBatchPaster {
         if (pending.containsKey(id) || jobs.stream().anyMatch(j -> j.player.equals(id))) { message(player,"treefactory.busy"); return; }
         if (pending.size()+jobs.size()>=4) { message(player,"treefactory.server_busy"); return; }
         ServerLevel level = player.level();
-        if (player.distanceToSqr(origin.getX()+.5,origin.getY()+.5,origin.getZ()+.5)>64*64
-                || !accessible(level,player,origin)) { message(player,"treefactory.invalid_target"); return; }
+        if(player.distanceToSqr(origin.getX()+.5,origin.getY()+.5,origin.getZ()+.5)>64*64) {
+            message(player,"treefactory.target_too_far"); return;
+        }
+        String originProblem=inaccessibleReason(level,player,origin);
+        if(originProblem!=null) { message(player,originProblem); return; }
         final EnumMap<Voxelizer.Material,BlockState> materials;
         try { materials=palette(config); }
         catch (IllegalArgumentException e) { message(player,"treefactory.invalid_palette"); return; }
@@ -94,7 +104,8 @@ public final class WorldBatchPaster {
         CompletableFuture.supplyAsync(() -> {
             TreeBuildTask.Result result = new TreeBuildTask().build(config,cancel::get);
             Map<BlockPos,BlockState> blocks = new LinkedHashMap<>();
-            result.blocks().forEach((p,m) -> blocks.put(origin.offset(p.x(),p.y(),p.z()),materials.get(m)));
+            result.blocks().forEach((p,m) -> blocks.put(origin.offset(p.x(),p.y(),p.z()),
+                    orient(materials.get(m),result.axes().get(p))));
             return blocks;
         },ForkJoinPool.commonPool()).whenComplete((blocks,error) -> {
             if (cancel.get()) return;
@@ -116,14 +127,13 @@ public final class WorldBatchPaster {
         Edit edit=history.peek(id);
         if (edit==null) { message(player,"treefactory.no_undo"); return; }
         if (!edit.dimension.equals(player.level().dimension())) { message(player,"treefactory.wrong_dimension"); return; }
-        for (Change c:edit.changes) if (!accessible(player.level(),player,c.pos)) { message(player,"treefactory.invalid_target"); return; }
         history.pop(id);
-        List<Change> reversed=new ArrayList<>(edit.changes); Collections.reverse(reversed);
-        jobs.addLast(new Job(id,player.level(),reversed,true));
+        jobs.addLast(new Job(id,player.level(),edit.changes.reversed(),true));
     }
     public void tick(MinecraftServer server) {
         long deadline=System.nanoTime()+4_000_000;
-        for (int budget=0; budget<1024 && !jobs.isEmpty() && System.nanoTime()<deadline; budget++) {
+        int budget=1024;
+        while(budget>0 && !jobs.isEmpty() && System.nanoTime()<deadline) {
             Job job=jobs.removeFirst(); ServerPlayer player=server.getPlayerList().getPlayer(job.player);
             if (player==null || player.level()!=job.level || !player.isCreative()) {
                 if (job.undo) job.iterator.forEachRemaining(job.deferred::add);
@@ -131,31 +141,46 @@ public final class WorldBatchPaster {
             }
             // Preflight reads share the tick budget with writes. No world access on worker threads,
             // no synchronous chunk generation, and no writes until the complete footprint passes.
-            if (job.validation!=null) {
-                if (job.validation.hasNext()) {
-                    var entry=job.validation.next(); BlockPos pos=entry.getKey();
-                    if (!accessible(job.level,player,pos)) { message(player,"treefactory.invalid_target"); continue; }
-                    BlockState old=job.level.getBlockState(pos);
-                    if (replaceable(old) && !old.equals(entry.getValue())) job.planned.add(new Change(pos,old,entry.getValue()));
+            boolean rejected=false;
+            for(int processed=0;processed<64 && budget>0 && System.nanoTime()<deadline;processed++) {
+                if(job.validation!=null) {
+                    if(job.validation.hasNext()) {
+                        var entry=job.validation.next(); BlockPos pos=entry.getKey(); budget--;
+                        String problem=inaccessibleReason(job.level,player,pos);
+                        if(problem!=null) {
+                            message(player,problem); rejected=true; break;
+                        }
+                        BlockState old=job.level.getBlockState(pos);
+                        if (replaceable(old) && !old.equals(entry.getValue())) job.planned.add(new Change(pos,old,entry.getValue()));
+                        continue;
+                    }
+                    job.validation=null; job.iterator=job.planned.iterator();
                 }
-                if (!job.validation.hasNext()) { job.validation=null; job.iterator=job.planned.iterator(); }
-                jobs.addLast(job); continue;
-            }
-            if (job.iterator.hasNext()) {
-                Change c=job.iterator.next();
-                if (accessible(job.level,player,c.pos)) {
-                    BlockState expected=job.undo?c.after:c.before, target=job.undo?c.before:c.after;
-                    if (job.level.getBlockState(c.pos).equals(expected) && job.level.getBlockEntity(c.pos)==null
+                if(!job.iterator.hasNext()) break;
+                Change c=job.iterator.next(); budget--;
+                if(accessible(job.level,player,c.pos)) {
+                    BlockState expected=job.undo?c.after:c.before;
+                    BlockState target=job.undo?c.before:c.after;
+                    if(job.level.getBlockState(c.pos).equals(expected) && job.level.getBlockEntity(c.pos)==null
                             && job.level.setBlock(c.pos,target,FLAGS)) job.applied.add(c);
-                } else if (job.undo) job.deferred.add(c);
+                } else if(job.undo) job.deferred.add(c);
             }
-            if (job.iterator.hasNext()) jobs.addLast(job); else finish(job,player);
+            if(rejected) continue;
+            if(job.validation!=null && !job.validation.hasNext()) {
+                job.validation=null; job.iterator=job.planned.iterator();
+            }
+            if(job.validation!=null || job.iterator.hasNext()) jobs.addLast(job);
+            else finish(job,player);
         }
     }
     private void finish(Job job,ServerPlayer player) {
         if (!job.undo && !job.applied.isEmpty() && player!=null) history.push(job.player,new Edit(job.level.dimension(),List.copyOf(job.applied)));
         if (job.undo && !job.deferred.isEmpty() && player!=null) history.push(job.player,new Edit(job.level.dimension(),List.copyOf(job.deferred)));
-        if (player!=null) player.sendSystemMessage(Component.translatable(job.undo?"treefactory.undone":"treefactory.built",job.applied.size()),false);
+        if(player!=null) {
+            if(job.undo && !job.deferred.isEmpty()) player.sendSystemMessage(
+                    Component.translatable("treefactory.undo_deferred",job.applied.size(),job.deferred.size()),false);
+            else player.sendSystemMessage(Component.translatable(job.undo?"treefactory.undone":"treefactory.built",job.applied.size()),false);
+        }
     }
     public void disconnect(UUID id) {
         AtomicBoolean flag=pending.remove(id); if(flag!=null) flag.set(true);
@@ -164,12 +189,19 @@ public final class WorldBatchPaster {
     public void stop() { pending.values().forEach(f -> f.set(true)); pending.clear(); jobs.clear(); history.clear(); nextAction.clear(); }
     private boolean acceptAction(ServerPlayer player) {
         long now=System.nanoTime();
-        if(now<nextAction.getOrDefault(player.getUUID(),0L)) return false;
+        Long next=nextAction.get(player.getUUID());
+        if(next!=null && now-next<0) return false;
         nextAction.put(player.getUUID(),now+500_000_000L); return true;
     }
     private static boolean accessible(ServerLevel level,ServerPlayer player,BlockPos pos) {
-        return !level.isOutsideBuildHeight(pos) && level.getWorldBorder().isWithinBounds(pos)
-                && level.hasChunkAt(pos) && level.mayInteract(player,pos);
+        return inaccessibleReason(level,player,pos)==null;
+    }
+    private static String inaccessibleReason(ServerLevel level,ServerPlayer player,BlockPos pos) {
+        if(level.isOutsideBuildHeight(pos)) return "treefactory.target_height";
+        if(!level.getWorldBorder().isWithinBounds(pos)) return "treefactory.target_border";
+        if(!level.hasChunkAt(pos)) return "treefactory.target_unloaded";
+        if(!level.mayInteract(player,pos)) return "treefactory.target_protected";
+        return null;
     }
     private static boolean replaceable(BlockState state) {
         return !state.hasBlockEntity() && (state.isAir() || state.canBeReplaced() || state.is(BlockTags.LEAVES));
