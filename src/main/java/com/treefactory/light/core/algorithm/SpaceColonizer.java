@@ -23,6 +23,7 @@ public final class SpaceColonizer {
         List<Vector3> attractors = new ArrayList<>();
         int count = Math.min(1500,(int)((180 + 400 * config.fullness()) * config.attractionDensity()));
         for (int i = 0; i < count; i++) {
+            if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) throw new CancellationException();
             double x, y, z;
             int attempts=0;
             do {
@@ -30,7 +31,8 @@ public final class SpaceColonizer {
                 attempts++;
             } while(attempts<256 && config.canopyShape().field(x,y,z) >
                     noise.sampleSimplex(x*3.1+7,y*3.1,z*3.1)*.12);
-            if(attempts==256) { i--; continue; }
+            // A shape that cannot accept samples must not retry this point forever.
+            if(attempts==256) continue;
             double vertical = config.canopyShape()==CanopyShape.SPHERE ? width : halfHeight;
             Vector3 point = new Vector3(.5+x*width,crownCenter+y*vertical,.5+z*width);
             attractors.add(point);
