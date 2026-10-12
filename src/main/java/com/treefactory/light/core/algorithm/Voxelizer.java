@@ -27,7 +27,7 @@ public final class Voxelizer {
             parents[node.parent()] = true;
             TreeNode parent = nodes.get(node.parent());
             double radius=Math.max(parent.radius(),node.radius());
-            Material wood=parent.position().y()<config.scale().height*.36 || radius>=1.45
+            Material wood=parent.position().y()<config.height()*.36 || radius>=1.45
                     ? Material.MAIN_TRUNK : radius>=.7 ? Material.THICK_BRANCH : Material.THIN_BRANCH;
             Axis axis=axis(parent.position(),node.position());
             fill(blocks,axes,parent.position(),node.position(),parent.radius(),node.radius(),wood,axis,cancelled,config.seed(),config.blockPalette());

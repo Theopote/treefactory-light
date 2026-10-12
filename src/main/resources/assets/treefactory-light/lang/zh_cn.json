@@ -17,7 +17,7 @@
   "treefactory.scale.medium": "中型 M",
   "treefactory.scale.large": "大型 L",
   "treefactory.scale.giant": "巨型 Giant",
-  "treefactory.size": "树木尺寸：%s",
+  "treefactory.size": "树木高度：%s 格",
   "treefactory.crookedness": "曲折度 %s%%",
   "treefactory.spread": "展开度 %s%%",
   "treefactory.fullness": "丰满度 %s%%",

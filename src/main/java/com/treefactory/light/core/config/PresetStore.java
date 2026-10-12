@@ -54,7 +54,7 @@ public final class PresetStore {
     public static String encode(String name, String author, TreeConfig c) {
         JsonObject root = new JsonObject();
         root.addProperty("name",name); root.addProperty("author",author); root.addProperty("version","1.1");
-        root.addProperty("preset_type",c.preset().id()); root.addProperty("scale",c.scale().id()); root.addProperty("seed",c.seed());
+        root.addProperty("preset_type",c.preset().id()); root.addProperty("scale",c.scale().id()); root.addProperty("height",c.height()); root.addProperty("seed",c.seed());
         JsonObject dna = new JsonObject();
         dna.addProperty("crookedness",c.crookedness()); dna.addProperty("spread",c.spread()); dna.addProperty("fullness",c.fullness());
         root.add("dna",dna);
@@ -90,9 +90,10 @@ public final class PresetStore {
                 palette.get("thin_branch").getAsString(),legacy.leavesBlock(),palette.get("secondary_leaf").getAsString(),
                 palette.get("accent_block").getAsString(),palette.get("primary_weight").getAsDouble(),
                 palette.get("secondary_weight").getAsDouble(),palette.get("accent_weight").getAsDouble());
+        double height=root.has("height")?root.get("height").getAsDouble():legacy.height();
         TreeConfig config=new TreeConfig(type,legacy.scale(),legacy.seed(),legacy.crookedness(),legacy.spread(),legacy.fullness(),
                 CanopyShape.valueOf(canopy.get("shape").getAsString().toUpperCase(Locale.ROOT)),canopy.get("scale").getAsDouble(),
-                canopy.get("density").getAsDouble(),canopy.get("pipe_exponent").getAsDouble(),blocks);
+                canopy.get("density").getAsDouble(),canopy.get("pipe_exponent").getAsDouble(),blocks,height);
         return new Preset(id,name,author,config);
     }
 }

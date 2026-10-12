@@ -55,7 +55,7 @@ public final class DrawerScreen extends Screen {
             }
         } else {
             TreeConfig c=state.config(); int y=54;
-            addContent(button(8,y-scroll,panel-16,"treefactory.scale."+c.scale().id(),()->{state.cycleScale(1);refresh();})); y+=28;
+            addContent(new ScaleSlider(8,y-scroll,panel-16,c.height(),h->state.update(state.config().withHeight(h)))); y+=28;
             addContent(new DNAControlSlider(8,y-scroll,panel-16,"treefactory.crookedness",c.crookedness(),v->state.update(state.config().withDna(v,state.config().spread(),state.config().fullness())))); y+=25;
             addContent(new DNAControlSlider(8,y-scroll,panel-16,"treefactory.spread",c.spread(),v->state.update(state.config().withDna(state.config().crookedness(),v,state.config().fullness())))); y+=25;
             addContent(new DNAControlSlider(8,y-scroll,panel-16,"treefactory.fullness",c.fullness(),v->state.update(state.config().withDna(state.config().crookedness(),state.config().spread(),v)))); y+=28;

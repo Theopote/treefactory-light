@@ -17,7 +17,7 @@
   "treefactory.scale.medium": "Medium (M)",
   "treefactory.scale.large": "Large (L)",
   "treefactory.scale.giant": "Giant",
-  "treefactory.size": "Tree size: %s",
+  "treefactory.size": "Tree height: %s blocks",
   "treefactory.crookedness": "Crookedness %s%%",
   "treefactory.spread": "Spread %s%%",
   "treefactory.fullness": "Fullness %s%%",

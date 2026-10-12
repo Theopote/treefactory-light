@@ -9,7 +9,7 @@ public final class PipeModelEngine {
         return apply(skeleton,2.75);
     }
     public List<TreeNode> apply(List<TreeNode> skeleton, TreeConfig config) {
-        return apply(skeleton,config.pipeExponent(),Math.max(1.0,config.scale().height*.055));
+        return apply(skeleton,config.pipeExponent(),Math.max(1.0,config.height()*.055));
     }
     public List<TreeNode> apply(List<TreeNode> skeleton,double exponent) {
         return apply(skeleton,exponent,Double.POSITIVE_INFINITY);

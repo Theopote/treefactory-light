@@ -16,7 +16,7 @@ public final class SpaceColonizer {
     public List<TreeNode> generate(TreeConfig config, BooleanSupplier cancelled) {
         Random random = new Random(config.seed());
         NoiseGenerator noise = new NoiseGenerator(config.seed());
-        double height = config.scale().height;
+        double height = config.height();
         double width = height * (.22 + .38 * config.spread()) * config.canopyScale();
         double halfHeight = height * .38 * config.canopyScale();
         double crownCenter = config.canopyShape()==CanopyShape.SPHERE ? Math.max(height*.76,width+2) : height*.76;

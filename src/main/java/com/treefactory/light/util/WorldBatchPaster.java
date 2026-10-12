@@ -83,7 +83,7 @@ public final class WorldBatchPaster {
         // Let the in-flight generation finish so continuous slider drags still show intermediate trees.
         if (pending.containsKey(id)) { queued.put(id,() -> preview(player,origin,config)); return; }
         ServerLevel level = player.level();
-        if(player.distanceToSqr(origin.getX()+.5,origin.getY()+.5,origin.getZ()+.5)>128*128) {
+        if(player.distanceToSqr(origin.getX()+.5,origin.getY()+.5,origin.getZ()+.5)>264*264) {
             message(player,"treefactory.target_too_far"); return;
         }
         String originProblem=inaccessibleReason(level,player,origin);

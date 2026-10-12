@@ -72,7 +72,7 @@ public final class ClientTreeState {
         Vec3 up=right.cross(forward).normalize();
         Vec3 dir=forward.add(right.scale(ndcX*aspect*tan)).add(up.scale(ndcY*tan)).normalize();
         Vec3 eye=mc.player.getEyePosition();
-        var hit=mc.level.clip(new ClipContext(eye,eye.add(dir.scale(100)),ClipContext.Block.OUTLINE,ClipContext.Fluid.NONE,mc.player));
+        var hit=mc.level.clip(new ClipContext(eye,eye.add(dir.scale(256)),ClipContext.Block.OUTLINE,ClipContext.Fluid.NONE,mc.player));
         BlockPos pos=origin(hit);
         if(pos==null) { toast("treefactory.aim_first"); return; }
         setTarget(pos);
@@ -125,7 +125,7 @@ public final class ClientTreeState {
     public void cycleScale(int direction) {
         update(config.withScale(config.scale().cycle(direction)));
         var player=Minecraft.getInstance().player;
-        if(player!=null) player.sendOverlayMessage(Component.translatable("treefactory.size",Component.translatable("treefactory.scale."+config.scale().id())));
+        if(player!=null) player.sendOverlayMessage(Component.translatable("treefactory.size",String.format("%.1f",config.height())));
     }
     public void refreshLibrary() {
         CompletableFuture.supplyAsync(()-> {
