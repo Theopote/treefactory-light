@@ -12,6 +12,5 @@ public class TreefactoryLightClient implements ClientModInitializer {
 		ClientTickEvents.END_CLIENT_TICK.register(client -> ClientTreeState.INSTANCE.tick());
 		ClientPlayConnectionEvents.DISCONNECT.register((handler,client) -> ClientTreeState.INSTANCE.disconnect());
 		PictureInPictureRendererRegistry.register(context -> new TreePictureRenderer());
-		HologramRenderer.register();
 	}
 }

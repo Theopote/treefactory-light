@@ -13,6 +13,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.*;
 import java.util.*;
 import java.util.concurrent.*;
@@ -26,15 +27,15 @@ public final class ClientTreeState {
     private final AtomicLong revision=new AtomicLong();
     private long changedAt=System.nanoTime();
     private boolean dirty=true, generating;
-    private BlockPos lockedOrigin;
+    private BlockPos target;
+    private boolean placeDirty, active;
+    private long placeChangedAt;
     private static final List<PresetStore.Preset> BUILT_IN_PRESETS=Arrays.stream(TreePreset.values())
             .map(type->new PresetStore.Preset("builtin-"+type.id(),type.id(),"Treefactory Light",
                     TreeConfig.defaults().withPreset(type)))
             .toList();
     private List<PresetStore.Preset> presets=BUILT_IN_PRESETS;
     private String status="";
-    private long lastAction;
-    private boolean hasAction;
     public TreeConfig config() { return config; }
     public PreviewSnapshot preview() { return preview!=null && preview.config().equals(config)?preview:null; }
     public List<PresetStore.Preset> presets() { return presets; }
@@ -45,28 +46,53 @@ public final class ClientTreeState {
         try { WorldBatchPaster.palette(next); }
         catch(IllegalArgumentException e) { toast("treefactory.invalid_palette"); return false; }
         config=next; revision.incrementAndGet(); dirty=true; changedAt=System.nanoTime();
+        placeDirty=true;
         return true;
     }
+    public BlockPos target() { return target; }
     public boolean holdingWand() {
         var p=Minecraft.getInstance().player;
         return p!=null && p.getMainHandItem().is(TreefactoryLight.TREE_WAND);
     }
-    public BlockPos origin() {
-        if(Minecraft.getInstance().gui.screen() instanceof DrawerScreen) return lockedOrigin;
-        var hit=Minecraft.getInstance().hitResult;
+    /** Placement point for a ray that hit the world; only upward faces of ground blocks are valid. */
+    private BlockPos origin(HitResult hit) {
         if(!(hit instanceof BlockHitResult block) || hit.getType()!=HitResult.Type.BLOCK
                 || block.getDirection()!=Direction.UP || Minecraft.getInstance().level==null) return null;
         BlockPos clicked=block.getBlockPos();
         return Minecraft.getInstance().level.getBlockState(clicked).canBeReplaced() ? clicked : clicked.above();
     }
+    /** Places the tree where the cursor points; guiX/guiY are in scaled GUI coordinates. */
+    public void placeAtCursor(double guiX,double guiY) {
+        Minecraft mc=Minecraft.getInstance();
+        if(mc.player==null || mc.level==null) return;
+        double ndcX=guiX/mc.getWindow().getGuiScaledWidth()*2-1, ndcY=1-guiY/mc.getWindow().getGuiScaledHeight()*2;
+        double tan=Math.tan(Math.toRadians(mc.options.fov().get())/2);
+        double aspect=(double)mc.getWindow().getWidth()/mc.getWindow().getHeight();
+        Vec3 forward=mc.player.getViewVector(1f), right=forward.cross(new Vec3(0,1,0)).normalize();
+        Vec3 up=right.cross(forward).normalize();
+        Vec3 dir=forward.add(right.scale(ndcX*aspect*tan)).add(up.scale(ndcY*tan)).normalize();
+        Vec3 eye=mc.player.getEyePosition();
+        var hit=mc.level.clip(new ClipContext(eye,eye.add(dir.scale(100)),ClipContext.Block.OUTLINE,ClipContext.Fluid.NONE,mc.player));
+        BlockPos pos=origin(hit);
+        if(pos==null) { toast("treefactory.aim_first"); return; }
+        setTarget(pos);
+    }
+    private void setTarget(BlockPos pos) {
+        target=pos; active=true; placeDirty=true; placeChangedAt=0;
+    }
     public void open() {
         Minecraft mc=Minecraft.getInstance();
-        if(mc.gui.screen() instanceof DrawerScreen) { mc.gui.setScreen(null); return; }
-        lockedOrigin=origin(); mc.gui.setScreen(new DrawerScreen()); refreshLibrary();
+        if(mc.gui.screen() instanceof DrawerScreen) return;
+        target=null; active=false; placeDirty=false;
+        BlockPos aimed=origin(mc.hitResult);
+        mc.gui.setScreen(new DrawerScreen()); refreshLibrary();
+        if(aimed!=null) setTarget(aimed);
     }
     public void tick() {
         Minecraft mc=Minecraft.getInstance();
+        if(active && mc.level!=null && !(mc.gui.screen() instanceof DrawerScreen)) cancel();
         if(mc.level==null || (!holdingWand() && !(mc.gui.screen() instanceof DrawerScreen))) return;
+        if(placeDirty && target!=null && System.nanoTime()-placeChangedAt>=80_000_000L) sendPreview();
         if(!dirty || generating || System.nanoTime()-changedAt<50_000_000L) return;
         generating=true; dirty=false;
         long token=revision.get(); TreeConfig snapshot=config; status=Component.translatable("treefactory.generating").getString();
@@ -79,22 +105,22 @@ public final class ClientTreeState {
                             result.tree().blocks().size(),result.blockWidth(),result.blockHeight(),result.blockDepth()).getString(); }
                 }));
     }
-    public void build() {
-        if(!throttle()) return;
-        BlockPos origin=origin();
-        if(origin==null) { toast("treefactory.aim_first"); return; }
-        if(!ClientPlayNetworking.canSend(C2SBuildTreePacket.TYPE)) { toast("treefactory.no_server"); return; }
-        ClientPlayNetworking.send(new C2SBuildTreePacket(origin,config));
+    private void sendPreview() {
+        placeDirty=false; placeChangedAt=System.nanoTime();
+        if(!ClientPlayNetworking.canSend(C2SPreviewTreePacket.TYPE)) { toast("treefactory.no_server"); return; }
+        ClientPlayNetworking.send(new C2SPreviewTreePacket(target,config));
     }
-    public void undo() {
-        if(!throttle()) return;
-        if(ClientPlayNetworking.canSend(C2SUndoPacket.TYPE)) ClientPlayNetworking.send(new C2SUndoPacket());
-        else toast("treefactory.no_server");
+    /** Makes the previewed tree permanent. Returns false when nothing has been placed yet. */
+    public boolean finish() {
+        if(!active || target==null) { toast("treefactory.aim_first"); return false; }
+        if(placeDirty) sendPreview();
+        if(ClientPlayNetworking.canSend(C2SFinishTreePacket.TYPE)) ClientPlayNetworking.send(new C2SFinishTreePacket(true));
+        active=false; target=null; return true;
     }
-    private boolean throttle() {
-        long now=System.nanoTime();
-        if(hasAction && now-lastAction<250_000_000L) return false;
-        lastAction=now; hasAction=true; return true;
+    /** Removes the unfinished preview tree from the world. */
+    public void cancel() {
+        if(active && ClientPlayNetworking.canSend(C2SFinishTreePacket.TYPE)) ClientPlayNetworking.send(new C2SFinishTreePacket(false));
+        active=false; target=null; placeDirty=false;
     }
     public void cycleScale(int direction) {
         update(config.withScale(config.scale().cycle(direction)));
@@ -128,8 +154,7 @@ public final class ClientTreeState {
         }));
     }
     public void disconnect() {
-        revision.incrementAndGet(); preview=null; dirty=true; lockedOrigin=null; presets=BUILT_IN_PRESETS;
-        hasAction=false;
+        revision.incrementAndGet(); preview=null;         dirty=true; target=null; active=false; placeDirty=false; presets=BUILT_IN_PRESETS;
         ThumbnailFBOMaker.clear();
     }
     public static void toast(String key) {

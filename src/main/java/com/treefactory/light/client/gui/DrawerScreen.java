@@ -1,13 +1,15 @@
 package com.treefactory.light.client.gui;
 
 import com.treefactory.light.client.*;
-import com.treefactory.light.client.gui.render.TreePictureRenderer;
 import com.treefactory.light.client.gui.widget.*;
 import com.treefactory.light.core.config.*;
+import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.*;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import com.mojang.blaze3d.platform.InputConstants;
 import org.jspecify.annotations.NonNull;
@@ -21,9 +23,9 @@ public final class DrawerScreen extends Screen {
     private boolean library;
     private enum Panel { NONE, SHAPES, MATERIALS }
     private Panel expanded=Panel.NONE;
-    private boolean rotating;
+    private boolean looking;
+    private double mouseX,lookX,lookY;
     private String presetName="My tree";
-    private float angle=(float)Math.PI/4,zoom=1;
     private static final String[] WOODS={"oak","spruce","birch","jungle","acacia","dark_oak","mangrove","cherry","pale_oak"};
     private static final CanopyShape[] SHAPE_ORDER={
             CanopyShape.CONE,CanopyShape.TRUNCATED_CONE,CanopyShape.CYLINDER,CanopyShape.SPINDLE,
@@ -38,9 +40,7 @@ public final class DrawerScreen extends Screen {
         panel=Math.max(64,width/4); content.clear(); fixed.clear();
         fixed.add(addWidget(button(8,24,(panel-20)/2,"treefactory.generator",()->{library=false;scroll=0;refresh();})));
         fixed.add(addWidget(button(12+(panel-20)/2,24,(panel-20)/2,"treefactory.library",()->{library=true;scroll=0;refresh();})));
-        fixed.add(addWidget(button(8,height-47,panel-16,"treefactory.build",state::build)));
-        fixed.add(addWidget(button(8,height-24,(panel-20)/2,"treefactory.undo",state::undo)));
-        fixed.add(addWidget(button(12+(panel-20)/2,height-24,(panel-20)/2,"gui.done",this::onClose)));
+        fixed.add(addWidget(button(8,height-24,panel-16,"treefactory.done",()->{ if(state.finish()) onClose(); })));
         if(library) {
             int gap=6, tile=Math.max(1,Math.min((panel-16-gap)/2,height-108)), y=54;
             List<PresetStore.Preset> presets=state.presets();
@@ -165,16 +165,45 @@ public final class DrawerScreen extends Screen {
             int y=53+(int)((track-thumb)*scroll/(double)Math.max(1,contentHeight-track));
             g.fill(panel-4,53,panel-2,height-55,0xFF274237); g.fill(panel-4,y,panel-2,y+thumb,0xFF83B99D);
         }
-        var preview=state.preview();
-        if(preview!=null) {
-            int x0=panel+12,y0=30,x1=width-12,y1=height-54;
-            float scale=(float)(Math.min(x1-x0,y1-y0)*.88/preview.extent())*zoom;
-            g.guiRenderState.addPicturesInPictureState(new TreePictureRenderer.State(preview,angle,true,x0,y0,x1,y1,scale,null));
-        }
         g.text(font,Component.translatable("treefactory.preview_hint"),panel+12,10,0xFFE2F5E9);
         g.text(font,state.status(),panel+12,height-39,0xFF9CE7BD);
-        Component target=state.origin()==null ? Component.translatable("treefactory.aim_first") : Component.translatable("treefactory.target", Objects.requireNonNull(state.origin()).toShortString());
-        g.text(font,target,panel+12,height-24,state.origin()==null?0xFFFFC580:0xFFB5CDBF);
+        BlockPos target=state.target();
+        Component target_=target==null ? Component.translatable("treefactory.aim_first") : Component.translatable("treefactory.target", target.toShortString());
+        g.text(font,target_,panel+12,height-24,target==null?0xFFFFC580:0xFFB5CDBF);
+    }
+    private boolean insidePanel(double x) { return x<panel; }
+    private static final Set<KeyMapping> HELD=new HashSet<>();
+    private void releaseMovement() {
+        for(KeyMapping key:HELD) key.setDown(false);
+        HELD.clear();
+    }
+    private KeyMapping[] movementKeys() {
+        var o=minecraft.options;
+        return new KeyMapping[]{o.keyUp,o.keyDown,o.keyLeft,o.keyRight,o.keyJump,o.keyShift,o.keySprint};
+    }
+    @Override public void mouseMoved(double x,double y) {
+        mouseX=x;
+        if(insidePanel(x)) releaseMovement();
+        super.mouseMoved(x,y);
+    }
+    @Override public boolean keyPressed(KeyEvent event) {
+        if(!insidePanel(mouseX) && !(getFocused() instanceof EditBox) && event.key()!=InputConstants.KEY_ESCAPE) {
+            for(KeyMapping key:movementKeys()) if(key.matches(event)) { key.setDown(true); HELD.add(key); return true; }
+        }
+        return super.keyPressed(event);
+    }
+    @Override public boolean keyReleased(KeyEvent event) {
+        for(KeyMapping key:movementKeys()) if(key.matches(event)) { key.setDown(false); HELD.remove(key); }
+        return super.keyReleased(event);
+    }
+    @Override public void removed() {
+        releaseMovement(); endLook();
+        super.removed();
+    }
+    private void endLook() {
+        if(!looking) return;
+        looking=false;
+        InputConstants.releaseMouse(minecraft.getWindow(),lookX,lookY);
     }
     @Override public boolean mouseScrolled(double x,double y,double horizontal,double vertical) {
         if(x<panel && y>=50 && y<height-51) {
@@ -186,20 +215,30 @@ public final class DrawerScreen extends Screen {
             }
             scroll=next; return true;
         }
-        if(x>=panel) { zoom=Math.clamp(zoom+(float)vertical*.08f,.35f,2); return true; }
         return super.mouseScrolled(x,y,horizontal,vertical);
     }
     @Override public boolean mouseClicked(MouseButtonEvent event,boolean doubleClick) {
-        if(event.button()==InputConstants.MOUSE_BUTTON_RIGHT && event.hasShiftDown()) { onClose(); return true; }
-        if(event.x()>=panel && event.button()==InputConstants.MOUSE_BUTTON_LEFT) { rotating=true; return true; }
-        return super.mouseClicked(event,doubleClick);
+        if(insidePanel(event.x())) return super.mouseClicked(event,doubleClick);
+        if(event.button()==InputConstants.MOUSE_BUTTON_RIGHT) { state.placeAtCursor(event.x(),event.y()); return true; }
+        if(event.button()==InputConstants.MOUSE_BUTTON_MIDDLE) {
+            looking=true;
+            lookX=minecraft.mouseHandler.xpos(); lookY=minecraft.mouseHandler.ypos();
+            InputConstants.grabMouse(minecraft.getWindow(),lookX,lookY);
+            return true;
+        }
+        return true;
     }
     @Override public boolean mouseDragged(@NonNull MouseButtonEvent event, double dx, double dy) {
-        if(rotating && event.button()==InputConstants.MOUSE_BUTTON_LEFT) { angle+=(float)dx*.012f; return true; }
+        if(looking && event.button()==InputConstants.MOUSE_BUTTON_MIDDLE && minecraft.player!=null) {
+            double scale=minecraft.getWindow().getGuiScale();
+            double sens=minecraft.options.sensitivity().get()*.6+.2; sens=sens*sens*sens*8;
+            minecraft.player.turn(dx*scale*sens,dy*scale*sens);
+            return true;
+        }
         return super.mouseDragged(event,dx,dy);
     }
     @Override public boolean mouseReleased(@NonNull MouseButtonEvent event) {
-        if(rotating && event.button()==InputConstants.MOUSE_BUTTON_LEFT) { rotating=false; return true; }
+        if(looking && event.button()==InputConstants.MOUSE_BUTTON_MIDDLE) { endLook(); return true; }
         return super.mouseReleased(event);
     }
     @Override public void extractBackground(@NonNull GuiGraphicsExtractor g, int x, int y, float delta) {}

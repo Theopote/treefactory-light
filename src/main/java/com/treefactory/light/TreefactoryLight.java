@@ -5,7 +5,6 @@ import com.treefactory.light.item.TreeWandItem;
 import com.treefactory.light.network.*;
 import com.treefactory.light.util.WorldBatchPaster;
 import net.fabricmc.fabric.api.networking.v1.*;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.*;
@@ -34,13 +33,14 @@ public class TreefactoryLight implements ModInitializer {
 	public void onInitialize() {
 		Registry.register(BuiltInRegistries.ITEM,id("tree_wand"),TREE_WAND);
 		CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.TOOLS_AND_UTILITIES).register(output -> output.accept(TREE_WAND));
-		PayloadTypeRegistry.serverboundPlay().register(C2SBuildTreePacket.TYPE,C2SBuildTreePacket.CODEC);
-		PayloadTypeRegistry.serverboundPlay().register(C2SUndoPacket.TYPE,C2SUndoPacket.CODEC);
-		ServerPlayNetworking.registerGlobalReceiver(C2SBuildTreePacket.TYPE,(packet,context) ->
-				context.server().execute(() -> PASTER.build(context.player(),packet.origin(),packet.config())));
-		ServerPlayNetworking.registerGlobalReceiver(C2SUndoPacket.TYPE,(packet,context) ->
-				context.server().execute(() -> PASTER.undo(context.player())));
-		ServerTickEvents.END_SERVER_TICK.register(PASTER::tick);
+		PayloadTypeRegistry.serverboundPlay().register(C2SPreviewTreePacket.TYPE,C2SPreviewTreePacket.CODEC);
+		PayloadTypeRegistry.serverboundPlay().register(C2SFinishTreePacket.TYPE,C2SFinishTreePacket.CODEC);
+		ServerPlayNetworking.registerGlobalReceiver(C2SPreviewTreePacket.TYPE,(packet,context) ->
+				context.server().execute(() -> PASTER.preview(context.player(),packet.origin(),packet.config())));
+		ServerPlayNetworking.registerGlobalReceiver(C2SFinishTreePacket.TYPE,(packet,context) ->
+				context.server().execute(() -> {
+					if (packet.commit()) PASTER.commit(context.player()); else PASTER.discard(context.player().getUUID());
+				}));
 		ServerPlayConnectionEvents.DISCONNECT.register((handler,server) -> PASTER.disconnect(handler.player.getUUID()));
 		ServerLifecycleEvents.SERVER_STOPPING.register(server -> PASTER.stop());
 		LOGGER.info("Treefactory Light beta initialized");
