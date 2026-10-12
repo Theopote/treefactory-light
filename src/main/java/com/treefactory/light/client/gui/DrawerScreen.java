@@ -50,7 +50,7 @@ public final class DrawerScreen extends Screen {
                 var preset=presets.get(i);
                 int x=8+(i%2)*(tile+gap), top=y+(i/2)*(tile+gap)-scroll;
                 addContent(new PresetCardWidget(x,top,tile,preset,()->{
-                    if(state.update(preset.config())) { library=false; expanded=Panel.NONE; scroll=0; refresh(); }
+                    if(state.update(preset.config())) refresh();
                 }));
             }
         } else {
