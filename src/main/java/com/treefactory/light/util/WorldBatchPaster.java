@@ -14,6 +14,7 @@ import net.minecraft.server.level.*;
 import net.minecraft.network.chat.Component;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.block.*;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
@@ -175,7 +176,7 @@ public final class WorldBatchPaster {
         ServerLevel level=level(tree.dimension());
         if (level==null) { message(player,"treefactory.nothing_to_undo"); return; }
         var entry=new PlacementHistory.Entry<>(tree.placed(), tree.original());
-        Map<BlockPos,BlockState> restore=entry.restorations(pos -> level.hasChunkAt(pos)?level.getBlockState(pos):null);
+        Map<BlockPos,BlockState> restore=entry.restorations(pos -> chunkReady(level, pos)?level.getBlockState(pos):null);
         int count=0;
         for (var cell : restore.entrySet()) {
             BlockPos pos=cell.getKey();
@@ -229,7 +230,8 @@ public final class WorldBatchPaster {
         for (Session session : sessions.values()) {
             if (session.level!=level) continue;
             for (BlockPos pos : new ArrayList<>(session.pendingRestore))
-                if (chunk.x()==pos.getX()>>4 && chunk.z()==pos.getZ()>>4 && restore(session, pos)) changed=true;
+                if (chunk.x()==SectionPos.blockToSectionCoord(pos.getX()) && chunk.z()==SectionPos.blockToSectionCoord(pos.getZ())
+                        && restore(session, pos)) changed=true;
         }
         changed|=sessions.entrySet().removeIf(e -> e.getValue().closing && e.getValue().placed.isEmpty());
         if (changed) dirty=true;
@@ -243,7 +245,7 @@ public final class WorldBatchPaster {
         Iterator<Map.Entry<BlockPos,BlockState>> tracked=session.placed.entrySet().iterator();
         while (tracked.hasNext()) {
             var entry=tracked.next();
-            if (level.hasChunkAt(entry.getKey()) && !level.getBlockState(entry.getKey()).equals(entry.getValue())) {
+            if (chunkReady(level, entry.getKey()) && !level.getBlockState(entry.getKey()).equals(entry.getValue())) {
                 session.original.remove(entry.getKey()); tracked.remove();
             }
         }
@@ -264,7 +266,7 @@ public final class WorldBatchPaster {
         dirty=true;
     }
     private static boolean restore(Session session,BlockPos pos) {
-        if (!session.level.hasChunkAt(pos)) { session.pendingRestore.add(pos); return false; }
+        if (!chunkReady(session.level, pos)) { session.pendingRestore.add(pos); return false; }
         BlockState expected=session.placed.get(pos), before=session.original.get(pos);
         if (expected!=null && before!=null && session.level.getBlockState(pos).equals(expected))
             session.level.setBlock(pos,before,FLAGS);
@@ -277,8 +279,13 @@ public final class WorldBatchPaster {
     private static String inaccessibleReason(ServerLevel level,BlockPos pos) {
         if(level.isOutsideBuildHeight(pos)) return "treefactory.target_height";
         if(!level.getWorldBorder().isWithinBounds(pos)) return "treefactory.target_border";
-        if(!level.hasChunkAt(pos)) return "treefactory.target_unloaded";
+        if(!chunkReady(level, pos)) return "treefactory.target_unloaded";
         return null;
+    }
+    /** Same check as deprecated {@code hasChunkAt}, without loading or generating chunks. */
+    private static boolean chunkReady(ServerLevel level, BlockPos pos) {
+        return level.getChunk(SectionPos.blockToSectionCoord(pos.getX()), SectionPos.blockToSectionCoord(pos.getZ()),
+                ChunkStatus.FULL, false) != null;
     }
     private static boolean replaceable(BlockState state) {
         return !state.hasBlockEntity() && (state.isAir() || state.canBeReplaced() || state.is(BlockTags.LEAVES));
