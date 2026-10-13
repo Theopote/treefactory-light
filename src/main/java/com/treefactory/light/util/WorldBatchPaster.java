@@ -160,7 +160,7 @@ public final class WorldBatchPaster {
         Session session=sessions.remove(id);
         if (session==null) return;
         ArrayDeque<CommittedTree> stack=undo.computeIfAbsent(id, k -> new ArrayDeque<>());
-        stack.addLast(new CommittedTree(session.level.dimension().location().toString(),
+        stack.addLast(new CommittedTree(session.level.dimension().identifier().toString(),
                 Map.copyOf(session.placed), Map.copyOf(session.original)));
         while (stack.size()>PlacementHistory.LIMIT) stack.removeFirst();
         dirty=true; persist();
@@ -299,7 +299,7 @@ public final class WorldBatchPaster {
         sessions.forEach((id,session) -> {
             CompoundTag tag=new CompoundTag();
             tag.putString("player", id.toString());
-            tag.putString("dimension", session.level.dimension().location().toString());
+            tag.putString("dimension", session.level.dimension().identifier().toString());
             tag.putBoolean("closing", session.closing);
             tag.put("blocks", footprint(session.placed, session.original));
             previews.add(tag);
@@ -361,7 +361,7 @@ public final class WorldBatchPaster {
     private ServerLevel level(String id) {
         Identifier identifier=Identifier.parse(id);
         for (ServerLevel level : server.getAllLevels())
-            if (level.dimension().location().equals(identifier)) return level;
+            if (level.dimension().identifier().equals(identifier)) return level;
         return null;
     }
     private static ListTag footprint(Map<BlockPos,BlockState> placed, Map<BlockPos,BlockState> original) {
