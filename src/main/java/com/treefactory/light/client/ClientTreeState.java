@@ -122,6 +122,10 @@ public final class ClientTreeState {
         if(active && ClientPlayNetworking.canSend(C2SFinishTreePacket.TYPE)) ClientPlayNetworking.send(new C2SFinishTreePacket(false));
         active=false; target=null; placeDirty=false;
     }
+    public void undo() {
+        if(!ClientPlayNetworking.canSend(C2SUndoTreePacket.TYPE)) { toast("treefactory.no_server"); return; }
+        ClientPlayNetworking.send(new C2SUndoTreePacket());
+    }
     public void cycleScale(int direction) {
         update(config.withScale(config.scale().cycle(direction)));
         var player=Minecraft.getInstance().player;

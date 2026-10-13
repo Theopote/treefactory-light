@@ -139,7 +139,11 @@ class TreeAlgorithmsTest {
     }
     @Test void giantWillowSharesDroopingGrowthAcrossTips() {
         var nodes=new SpaceColonizer().generate(TreeConfig.defaults().withPreset(TreePreset.WILLOW).withScale(TreeScale.GIANT));
-        int crownNodes=Math.min(SpaceColonizer.MAX_NODES,nodes.size());
+        int crownNodes=nodes.size();
+        for(int i=1;i<nodes.size();i++) {
+            Vector3 p=nodes.get(i).position(), par=nodes.get(nodes.get(i).parent()).position();
+            if(Math.abs(p.x()-par.x())<1e-9 && Math.abs(p.z()-par.z())<1e-9 && p.y()<par.y()-.5) { crownNodes=i; break; }
+        }
         boolean[] crownParent=new boolean[crownNodes], drooping=new boolean[crownNodes];
         for(int i=1;i<crownNodes;i++) crownParent[nodes.get(i).parent()]=true;
         for(int i=crownNodes;i<nodes.size();i++) if(nodes.get(i).parent()<crownNodes) drooping[nodes.get(i).parent()]=true;
@@ -154,5 +158,25 @@ class TreeAlgorithmsTest {
             var nodes=new TreeBuildTask().build(config,()->false).nodes();
             assertTrue(nodes.getFirst().radius()<=Math.max(1.0,scale.height*.055)+1e-9);
         }
+    }
+    @Test void oakBranchesDoNotGrowDownward() {
+        var nodes=new SpaceColonizer().generate(TreeConfig.defaults());
+        int down=0;
+        for(int i=1;i<nodes.size();i++) {
+            if(nodes.get(i).position().y()<nodes.get(nodes.get(i).parent()).position().y()) down++;
+        }
+        assertEquals(0, down);
+    }
+    @Test void pineTrunkMaterialStaysNearTheColumn() {
+        var result=new TreeBuildTask().build(TreeConfig.defaults().withPreset(TreePreset.PINE).withScale(TreeScale.GIANT),()->false);
+        double cap=Math.max(1.0,TreeScale.GIANT.height*.055)+2.5;
+        long bark=0,far=0;
+        for(var cell:result.blocks().entrySet()) {
+            if(cell.getValue()!=Voxelizer.Material.MAIN_TRUNK) continue;
+            bark++;
+            if(Math.hypot(cell.getKey().x()+.5,cell.getKey().z()+.5)>cap) far++;
+        }
+        assertTrue(bark>0);
+        assertTrue(far<=bark*.4, far+" of "+bark+" pine trunk voxels are far from the column");
     }
 }

@@ -5,7 +5,9 @@ import com.treefactory.light.item.TreeWandItem;
 import com.treefactory.light.network.*;
 import com.treefactory.light.util.WorldBatchPaster;
 import net.fabricmc.fabric.api.networking.v1.*;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.*;
 import net.minecraft.resources.ResourceKey;
@@ -35,14 +37,20 @@ public class TreefactoryLight implements ModInitializer {
 		CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.TOOLS_AND_UTILITIES).register(output -> output.accept(TREE_WAND));
 		PayloadTypeRegistry.serverboundPlay().register(C2SPreviewTreePacket.TYPE,C2SPreviewTreePacket.CODEC);
 		PayloadTypeRegistry.serverboundPlay().register(C2SFinishTreePacket.TYPE,C2SFinishTreePacket.CODEC);
+		PayloadTypeRegistry.serverboundPlay().register(C2SUndoTreePacket.TYPE,C2SUndoTreePacket.CODEC);
 		ServerPlayNetworking.registerGlobalReceiver(C2SPreviewTreePacket.TYPE,(packet,context) ->
 				context.server().execute(() -> PASTER.preview(context.player(),packet.origin(),packet.config())));
 		ServerPlayNetworking.registerGlobalReceiver(C2SFinishTreePacket.TYPE,(packet,context) ->
 				context.server().execute(() -> {
 					if (packet.commit()) PASTER.commit(context.player()); else PASTER.discard(context.player().getUUID());
 				}));
+		ServerPlayNetworking.registerGlobalReceiver(C2SUndoTreePacket.TYPE,(packet,context) ->
+				context.server().execute(() -> PASTER.undo(context.player())));
 		ServerPlayConnectionEvents.DISCONNECT.register((handler,server) -> PASTER.disconnect(handler.player.getUUID()));
+		ServerLifecycleEvents.SERVER_STARTED.register(server -> PASTER.attach(server));
 		ServerLifecycleEvents.SERVER_STOPPING.register(server -> PASTER.stop());
+		ServerTickEvents.END_SERVER_TICK.register(server -> PASTER.tick());
+		ServerChunkEvents.CHUNK_LOAD.register((level,chunk,generated) -> PASTER.chunkLoaded(level, chunk.getPos()));
 		LOGGER.info("Treefactory Light beta initialized");
 	}
 

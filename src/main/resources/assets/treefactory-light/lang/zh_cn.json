@@ -70,5 +70,10 @@
   "treefactory.target_unloaded": "树木经过未加载的区块",
   "treefactory.target_protected": "当前区域不允许建造",
   "treefactory.invalid_palette": "请选择有效的树干、树枝、树叶和装饰方块",
-  "treefactory.built": "已放置 %s 个方块"
+  "treefactory.built": "已放置 %s 个方块",
+  "treefactory.undo": "撤销上一棵",
+  "treefactory.undone": "已撤销 %s 个方块",
+  "treefactory.nothing_to_undo": "没有可撤销的树木",
+  "key.treefactory-light.undo": "撤销上一棵树",
+  "key.category.treefactory-light.controls": "Treefactory Light"
 }

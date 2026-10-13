@@ -70,5 +70,10 @@
   "treefactory.target_unloaded": "The tree crosses an unloaded chunk",
   "treefactory.target_protected": "Building is not allowed here",
   "treefactory.invalid_palette": "Choose valid trunk, branch, leaf, and accent blocks",
-  "treefactory.built": "Placed %s blocks"
+  "treefactory.built": "Placed %s blocks",
+  "treefactory.undo": "Undo last tree",
+  "treefactory.undone": "Undid %s blocks",
+  "treefactory.nothing_to_undo": "Nothing to undo",
+  "key.treefactory-light.undo": "Undo last tree",
+  "key.category.treefactory-light.controls": "Treefactory Light"
 }

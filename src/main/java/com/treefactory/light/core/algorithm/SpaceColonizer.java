@@ -7,8 +7,8 @@ import java.util.concurrent.CancellationException;
 import java.util.function.BooleanSupplier;
 
 public final class SpaceColonizer {
-    public static final int MAX_NODES = 1800;
-    public static final int MAX_WILLOW_NODES = 3600;
+    public static final int MAX_NODES = 2800;
+    public static final int MAX_WILLOW_NODES = 5000;
     public static final int MAX_ITERATIONS = 160;
 
     public List<TreeNode> generate(TreeConfig config) { return generate(config, () -> false); }
@@ -20,6 +20,10 @@ public final class SpaceColonizer {
         double width = height * (.22 + .38 * config.spread()) * config.canopyScale();
         double halfHeight = height * .38 * config.canopyScale();
         double crownCenter = config.canopyShape()==CanopyShape.SPHERE ? Math.max(height*.76,width+2) : height*.76;
+        double leanAngle = random.nextDouble()*Math.PI*2;
+        double leanMag = height*.05*(.3+config.crookedness()*1.4);
+        double trunkTop = Math.max(2,height*.36);
+        double crownDX = Math.cos(leanAngle)*leanMag*1.5, crownDZ = Math.sin(leanAngle)*leanMag*1.5;
         List<Vector3> attractors = new ArrayList<>();
         int count = Math.min(1500,(int)((180 + 400 * config.fullness()) * config.attractionDensity()));
         for (int i = 0; i < count; i++) {
@@ -29,19 +33,23 @@ public final class SpaceColonizer {
             do {
                 x=random.nextDouble()*2-1; y=random.nextDouble()*2-1; z=random.nextDouble()*2-1;
                 attempts++;
-            } while(attempts<256 && config.canopyShape().field(x,y,z) >
-                    noise.sampleSimplex(x*3.1+7,y*3.1,z*3.1)*.12);
+            } while(attempts<256 && (config.canopyShape().field(x,y,z) >
+                    noise.sampleSimplex(x*3.1+7,y*3.1,z*3.1)*.12
+                    || noise.sample(x*1.9+4.3,y*1.9+1.1,z*1.9+8.7)>.22));
             // A shape that cannot accept samples must not retry this point forever.
             if(attempts==256) continue;
             double vertical = config.canopyShape()==CanopyShape.SPHERE ? width : halfHeight;
-            Vector3 point = new Vector3(.5+x*width,crownCenter+y*vertical,.5+z*width);
+            Vector3 point = new Vector3(.5+crownDX+x*width,crownCenter+y*vertical,.5+crownDZ+z*width);
             attractors.add(point);
         }
         List<TreeNode> nodes = new ArrayList<>();
         nodes.add(new TreeNode(new Vector3(.5,.5,.5), -1, .5));
         for (int y = 1; y <= height*.36; y++) {
-            double bend = config.crookedness() * Math.sin(y*.3) * .55;
-            nodes.add(new TreeNode(new Vector3(.5+bend,y+.5,.5), nodes.size()-1,.5));
+            double t = Math.min(1,y/trunkTop), ease = t*t;
+            double wob = (.25+config.crookedness()*.9);
+            double bx = Math.cos(leanAngle)*leanMag*ease + wob*noise.sample(y*.19+11.3,5.1,2.2);
+            double bz = Math.sin(leanAngle)*leanMag*ease + wob*noise.sample(y*.19+3.7,9.4,6.6);
+            nodes.add(new TreeNode(new Vector3(.5+bx,y+.5,.5+bz), nodes.size()-1,.5));
         }
         double influence = Math.max(5, height*.4*config.canopyScale()), kill2 = 1.2*1.2;
         Set<Cell> occupied = new HashSet<>();
@@ -77,7 +85,15 @@ public final class SpaceColonizer {
                 Vector3 p = nodes.get(i).position();
                 Vector3 perturb = new Vector3(noise.sample(p.x()*.2,p.y()*.2,p.z()*.2),
                         noise.sample(p.x()*.2+17,p.y()*.2,p.z()*.2),noise.sample(p.x()*.2,p.y()*.2,p.z()*.2+31));
-                Vector3 dir = sum[i].normalize().add(perturb.multiply(config.crookedness()*.7)).normalize();
+                TreeNode self = nodes.get(i);
+                Vector3 inertia = self.parent()>=0 ? p.subtract(nodes.get(self.parent()).position()).normalize() : new Vector3(0,1,0);
+                boolean droop = config.preset()==TreePreset.WILLOW;
+                Vector3 dir = sum[i].normalize().add(inertia.multiply(1.0)).add(new Vector3(0,droop?-.05:.14,0))
+                        .add(perturb.multiply(config.crookedness()*.3)).normalize();
+                if(!droop && dir.y()<0) {
+                    if(Math.hypot(dir.x(),dir.z())<1e-6) dir=new Vector3(0,1,0);
+                    else dir=new Vector3(dir.x(),0,dir.z()).normalize();
+                }
                 Vector3 next = p.add(dir.multiply(1.15));
                 if (next.y() < .5 || !occupied.add(quantize(next))) continue;
                 nodes.add(new TreeNode(next,i,.5));

@@ -18,9 +18,9 @@ public record BlockPalette(String mainTrunk, String thickBranch, String thinBran
             throw new IllegalArgumentException("Canopy weights must be nonnegative and sum to one");
     }
     public static BlockPalette defaults(String wood) {
-        return new BlockPalette("minecraft:"+wood+"_log", "minecraft:stripped_"+wood+"_log",
-                "minecraft:"+wood+"_planks", "minecraft:"+wood+"_leaves",
-                "minecraft:flowering_azalea_leaves", "minecraft:moss_block", .8, .15, .05);
+        String log="minecraft:"+wood+"_log";
+        return new BlockPalette(log, log, log, "minecraft:"+wood+"_leaves",
+                "minecraft:flowering_azalea_leaves", "minecraft:moss_block", .96, .02, .02);
     }
     public BlockPalette withMainAndPrimary(String trunk, String leaf) {
         return new BlockPalette(trunk,thickBranch,thinBranch,leaf,secondaryLeaf,accentBlock,

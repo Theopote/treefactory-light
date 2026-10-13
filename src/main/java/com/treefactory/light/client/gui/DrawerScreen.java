@@ -40,7 +40,9 @@ public final class DrawerScreen extends Screen {
         panel=Math.max(64,width/4); content.clear(); fixed.clear();
         fixed.add(addWidget(button(8,24,(panel-20)/2,"treefactory.generator",()->{library=false;scroll=0;refresh();})));
         fixed.add(addWidget(button(12+(panel-20)/2,24,(panel-20)/2,"treefactory.library",()->{library=true;scroll=0;refresh();})));
-        fixed.add(addWidget(button(8,height-24,panel-16,"treefactory.done",()->{ if(state.finish()) onClose(); })));
+        int half=Math.max(1,(panel-18)/2);
+        fixed.add(addWidget(button(8,height-24,half,"treefactory.undo",()->state.undo())));
+        fixed.add(addWidget(button(10+half,height-24,half,"treefactory.done",()->{ if(state.finish()) onClose(); })));
         if(library) {
             int gap=6, tile=Math.max(1,Math.min((panel-16-gap)/2,height-108)), y=54;
             List<PresetStore.Preset> presets=state.presets();
@@ -86,8 +88,8 @@ public final class DrawerScreen extends Screen {
             addContent(materials); y+=23;
             if(expanded==Panel.MATERIALS) {
             addContent(paletteButton(y,"treefactory.log",c.blockPalette().mainTrunk(),"","_log",0)); y+=23;
-            addContent(paletteButton(y,"treefactory.thick_branch",c.blockPalette().thickBranch(),"stripped_","_log",1)); y+=23;
-            addContent(paletteButton(y,"treefactory.thin_branch",c.blockPalette().thinBranch(),"","_planks",2)); y+=23;
+            addContent(paletteButton(y,"treefactory.thick_branch",c.blockPalette().thickBranch(),"","_log",1)); y+=23;
+            addContent(paletteButton(y,"treefactory.thin_branch",c.blockPalette().thinBranch(),"","_log",2)); y+=23;
             addContent(paletteButton(y,"treefactory.leaves",c.blockPalette().primaryLeaf(),"","_leaves",3)); y+=23;
             addContent(paletteButton(y,"treefactory.secondary_leaf",c.blockPalette().secondaryLeaf(),"","_leaves",4)); y+=23;
             Button accent=button(16,y-scroll,panel-24,"treefactory.accent",()->{
@@ -98,8 +100,8 @@ public final class DrawerScreen extends Screen {
             addContent(accent); y+=23;
             Button weights=button(16,y-scroll,panel-24,"treefactory.leaf_weights",()->{
                 var p=state.config().blockPalette();
-                double[][] choices={{.8,.15,.05},{.65,.25,.10},{.95,.05,0}};
-                int index=p.primaryWeight()==.8?1:p.primaryWeight()==.65?2:0;
+                double[][] choices={{.96,.02,.02},{.8,.15,.05},{.95,.05,0}};
+                int index=p.primaryWeight()==.96?1:p.primaryWeight()==.8?2:0;
                 state.update(state.config().withBlockPalette(p.withWeights(choices[index][0],choices[index][1],choices[index][2])));refresh();
             });
             var weightsNow=c.blockPalette();

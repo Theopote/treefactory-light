@@ -27,7 +27,9 @@ public final class Voxelizer {
             parents[node.parent()] = true;
             TreeNode parent = nodes.get(node.parent());
             double radius=Math.max(parent.radius(),node.radius());
-            Material wood=parent.position().y()<config.height()*.36 || radius>=1.45
+            double cap=Math.max(1.0,config.height()*.055);
+            double lateral=Math.hypot(parent.position().x()-.5,parent.position().z()-.5);
+            Material wood=parent.position().y()<config.height()*.36+1 && lateral<=cap+.8
                     ? Material.MAIN_TRUNK : radius>=.7 ? Material.THICK_BRANCH : Material.THIN_BRANCH;
             Axis axis=axis(parent.position(),node.position());
             fill(blocks,axes,parent.position(),node.position(),parent.radius(),node.radius(),wood,axis,cancelled,config.seed(),config.blockPalette());
@@ -37,10 +39,23 @@ public final class Voxelizer {
             double radius = 1.2+config.fullness()*1.8;
             for (int i=0; i<nodes.size(); i++) if (!parents[i]) {
                 Vector3 p = nodes.get(i).position();
-                fill(blocks,axes,p,p,radius,radius,Material.PRIMARY_LEAF,Axis.Y,cancelled,config.seed(),config.blockPalette());
+                double leafRadius=radius*(.72+.5*tipHash(i,config.seed()));
+                if (config.preset()==TreePreset.WILLOW && nodes.get(i).parent()>=0
+                        && p.y()<nodes.get(nodes.get(i).parent()).position().y())
+                    leafRadius*=.45;
+                fill(blocks,axes,p,p,leafRadius,leafRadius,Material.PRIMARY_LEAF,Axis.Y,cancelled,config.seed(),config.blockPalette());
             }
         }
         return new VoxelData(Collections.unmodifiableMap(blocks),Collections.unmodifiableMap(axes));
+    }
+    private static double tipHash(int i,long seed) {
+        long h=seed ^ (i*0x9E3779B97F4A7C15L); h=(h^(h>>>30))*0xBF58476D1CE4E5B9L; h=(h^(h>>>27))*0x94D049BB133111EBL;
+        return ((h^(h>>>31))>>>11)*0x1.0p-53;
+    }
+    private static double cellHash(long a,long b,long c,long seed) {
+        long h=seed ^ (a*0x9E3779B97F4A7C15L) ^ (b*0xC2B2AE3D27D4EB4FL) ^ (c*0x165667B19E3779F9L);
+        h=(h^(h>>>30))*0xBF58476D1CE4E5B9L; h=(h^(h>>>27))*0x94D049BB133111EBL;
+        return ((h^(h>>>31))>>>11)*0x1.0p-53;
     }
     private static Axis axis(Vector3 a,Vector3 b) {
         Vector3 delta=b.subtract(a);
@@ -64,6 +79,10 @@ public final class Voxelizer {
                 for (int z=(int)Math.floor(Math.min(a.z(),b.z())-r); z<=Math.ceil(Math.max(a.z(),b.z())+r); z++) {
                     if (!contains(new Vector3(x+.5,y+.5,z+.5),a,b,r1,r2)) continue;
                     Cell cell = new Cell(x,y,z);
+                    if (!material.woody()) {
+                        double dx=x+.5-a.x(),dy=y+.5-a.y(),dz=z+.5-a.z();
+                        if (Math.sqrt(dx*dx+dy*dy+dz*dz) > r*(.78+.3*cellHash(x,y,z,seed^0x5bd1e995L))) continue;
+                    }
                     if (material.woody()) putWood(result,axes,cell,material,axis);
                     else result.putIfAbsent(cell,leafMaterial(cell,seed,palette));
                     if (result.size()>MAX_BLOCKS) throw new IllegalArgumentException("Tree exceeds block budget");
@@ -75,10 +94,9 @@ public final class Voxelizer {
     }
     /** A radius-0.5 diagonal can miss face-adjacent voxel centres. Keep a connected digital spine. */
     private static Material leafMaterial(Cell cell,long seed,BlockPalette palette) {
-        long h=seed ^ (cell.x()*0x9E3779B97F4A7C15L) ^ (cell.y()*0xC2B2AE3D27D4EB4FL) ^ (cell.z()*0x165667B19E3779F9L);
-        h=(h^(h>>>30))*0xBF58476D1CE4E5B9L;
-        h=(h^(h>>>27))*0x94D049BB133111EBL;
-        double sample=((h^(h>>>31))>>>11)*0x1.0p-53;
+        double cellU=cellHash(cell.x(),cell.y(),cell.z(),seed);
+        double patchU=cellHash(Math.floorDiv(cell.x(),3),Math.floorDiv(cell.y(),3),Math.floorDiv(cell.z(),3),seed^0x77L);
+        double sample=cellHash(cell.x(),cell.y(),cell.z(),seed^0x1234L)<.6 ? patchU : cellU;
         if(sample<palette.primaryWeight()) return Material.PRIMARY_LEAF;
         if(sample<palette.primaryWeight()+palette.secondaryWeight()) return Material.SECONDARY_LEAF;
         return Material.ACCENT;
