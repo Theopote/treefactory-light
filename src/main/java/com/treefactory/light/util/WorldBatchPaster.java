@@ -67,22 +67,15 @@ public final class WorldBatchPaster {
     public static boolean holdingWand(ServerPlayer p) {
         return p.getMainHandItem().is(TreefactoryLight.TREE_WAND);
     }
-    public static BlockState palette(String id, boolean leaves) {
-        Block block = BuiltInRegistries.BLOCK.getOptional(Identifier.parse(id)).orElseThrow(() -> new IllegalArgumentException("Unknown block: "+id));
-        BlockState state = block.defaultBlockState();
-        if (!state.is(leaves ? BlockTags.LEAVES : BlockTags.LOGS)) throw new IllegalArgumentException("Choose a "+(leaves?"leaves":"log")+" block");
-        if (leaves && state.hasProperty(BlockStateProperties.PERSISTENT)) state = state.setValue(BlockStateProperties.PERSISTENT,true);
-        return state;
-    }
     public static EnumMap<Voxelizer.Material,BlockState> palette(TreeConfig config) {
         var p=config.blockPalette();
         EnumMap<Voxelizer.Material,BlockState> result=new EnumMap<>(Voxelizer.Material.class);
-        result.put(Voxelizer.Material.MAIN_TRUNK,palette(p.mainTrunk(),false));
-        result.put(Voxelizer.Material.THICK_BRANCH,palette(p.thickBranch(),false));
-        result.put(Voxelizer.Material.THIN_BRANCH,wood(p.thinBranch()));
-        result.put(Voxelizer.Material.PRIMARY_LEAF,palette(p.primaryLeaf(),true));
-        result.put(Voxelizer.Material.SECONDARY_LEAF,palette(p.secondaryLeaf(),true));
-        result.put(Voxelizer.Material.ACCENT,accent(p.accentBlock()));
+        result.put(Voxelizer.Material.MAIN_TRUNK,PaletteRules.resolve(PaletteRules.Role.TRUNK,p.mainTrunk()));
+        result.put(Voxelizer.Material.THICK_BRANCH,PaletteRules.resolve(PaletteRules.Role.THICK_BRANCH,p.thickBranch()));
+        result.put(Voxelizer.Material.THIN_BRANCH,PaletteRules.resolve(PaletteRules.Role.THIN_BRANCH,p.thinBranch()));
+        result.put(Voxelizer.Material.PRIMARY_LEAF,PaletteRules.resolve(PaletteRules.Role.PRIMARY_LEAF,p.primaryLeaf()));
+        result.put(Voxelizer.Material.SECONDARY_LEAF,PaletteRules.resolve(PaletteRules.Role.SECONDARY_LEAF,p.secondaryLeaf()));
+        result.put(Voxelizer.Material.ACCENT,PaletteRules.resolve(PaletteRules.Role.ACCENT,p.accentBlock()));
         return result;
     }
     public static BlockState orient(BlockState state,Voxelizer.Axis axis) {
@@ -91,21 +84,6 @@ public final class WorldBatchPaster {
             case X -> Direction.Axis.X; case Y -> Direction.Axis.Y; case Z -> Direction.Axis.Z;
         };
         return state.setValue(BlockStateProperties.AXIS,direction);
-    }
-    private static BlockState wood(String id) {
-        BlockState state=BuiltInRegistries.BLOCK.getOptional(Identifier.parse(id))
-                .orElseThrow(()->new IllegalArgumentException("Unknown block: "+id)).defaultBlockState();
-        if(!state.is(BlockTags.LOGS) && !state.is(BlockTags.PLANKS) && !state.is(BlockTags.FENCES))
-            throw new IllegalArgumentException("Choose a log, planks, or a fence");
-        return state;
-    }
-    private static BlockState accent(String id) {
-        BlockState state=BuiltInRegistries.BLOCK.getOptional(Identifier.parse(id))
-                .orElseThrow(()->new IllegalArgumentException("Unknown block: "+id)).defaultBlockState();
-        if(state.getBlock()!=Blocks.MOSS_BLOCK && state.getBlock()!=Blocks.OCHRE_FROGLIGHT
-                && state.getBlock()!=Blocks.PEARLESCENT_FROGLIGHT && state.getBlock()!=Blocks.VERDANT_FROGLIGHT)
-            throw new IllegalArgumentException("Choose moss or froglight for accent");
-        return state;
     }
     /** Places (or moves/rebuilds) the player's preview tree. A newer request supersedes any unfinished one. */
     public void preview(ServerPlayer player, BlockPos origin, TreeConfig config) {

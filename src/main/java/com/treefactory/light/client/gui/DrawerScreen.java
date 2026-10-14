@@ -21,12 +21,15 @@ public final class DrawerScreen extends Screen {
     private final List<AbstractWidget> content=new ArrayList<>(),fixed=new ArrayList<>();
     private int panel,scroll,contentHeight;
     private boolean library;
-    private enum Panel { NONE, SHAPES, MATERIALS }
+    private enum Panel { NONE, SHAPES }
     private Panel expanded=Panel.NONE;
+    private final MaterialPanel materials=new MaterialPanel();
+    private final List<AbstractWidget> materialWidgets=new ArrayList<>();
+    private boolean materialsOpen;
+    private int materialLeft,materialWidth;
     private boolean looking;
     private double mouseX,lookX,lookY;
     private String presetName="My tree";
-    private static final String[] WOODS={"oak","spruce","birch","jungle","acacia","dark_oak","mangrove","cherry","pale_oak"};
     private static final CanopyShape[] SHAPE_ORDER={
             CanopyShape.CONE,CanopyShape.TRUNCATED_CONE,CanopyShape.CYLINDER,CanopyShape.SPINDLE,
             CanopyShape.PARABOLOID,CanopyShape.OVOID,CanopyShape.PROLATE_ELLIPSOID,CanopyShape.SPHERE,
@@ -37,7 +40,8 @@ public final class DrawerScreen extends Screen {
     public DrawerScreen() { super(Component.literal("Treefactory Light")); }
     public void refresh() { rebuildWidgets(); }
     @Override protected void init() {
-        panel=Math.max(64,width/4); content.clear(); fixed.clear();
+        panel=Math.max(64,width/4); content.clear(); fixed.clear(); materialWidgets.clear();
+        materialWidth=MaterialPanel.widthFor(width); materialLeft=panel;
         fixed.add(addWidget(button(8,24,(panel-20)/2,"treefactory.generator",()->{library=false;scroll=0;refresh();})));
         fixed.add(addWidget(button(12+(panel-20)/2,24,(panel-20)/2,"treefactory.library",()->{library=true;scroll=0;refresh();})));
         int half=Math.max(1,(panel-18)/2);
@@ -83,39 +87,17 @@ public final class DrawerScreen extends Screen {
                     v->{TreeConfig now=state.config();state.update(now.withCanopy(now.canopyShape(),now.canopyScale(),.5+1.5*v));})); y+=25;
             addContent(new DNAControlSlider(8,y-scroll,panel-16,"treefactory.pipe_exponent",(c.pipeExponent()-2.5)/.5,
                     v->state.update(state.config().withPipeExponent(2.5+.5*v)))); y+=28;
-            Button materials=button(8,y-scroll,panel-16,"treefactory.choose_materials",()->toggle(Panel.MATERIALS));
-            materials.setMessage(Component.translatable("treefactory.choose_materials").append(expanded==Panel.MATERIALS?" ▲":" ▼"));
-            addContent(materials); y+=23;
-            if(expanded==Panel.MATERIALS) {
-            addContent(paletteButton(y,"treefactory.log",c.blockPalette().mainTrunk(),"","_log",0)); y+=23;
-            addContent(paletteButton(y,"treefactory.thick_branch",c.blockPalette().thickBranch(),"","_log",1)); y+=23;
-            addContent(paletteButton(y,"treefactory.thin_branch",c.blockPalette().thinBranch(),"","_log",2)); y+=23;
-            addContent(paletteButton(y,"treefactory.leaves",c.blockPalette().primaryLeaf(),"","_leaves",3)); y+=23;
-            addContent(paletteButton(y,"treefactory.secondary_leaf",c.blockPalette().secondaryLeaf(),"","_leaves",4)); y+=23;
-            Button accent=button(16,y-scroll,panel-24,"treefactory.accent",()->{
-                var p=state.config().blockPalette(); String next=p.accentBlock().equals("minecraft:moss_block")?"minecraft:ochre_froglight":"minecraft:moss_block";
-                state.update(state.config().withBlockPalette(p.withBlocks(p.mainTrunk(),p.thickBranch(),p.thinBranch(),p.primaryLeaf(),p.secondaryLeaf(),next)));refresh();
-            });
-            accent.setMessage(Component.translatable("treefactory.accent").append(": ").append(Component.translatable("block."+c.blockPalette().accentBlock().replace(':','.'))));
-            addContent(accent); y+=23;
-            Button weights=button(16,y-scroll,panel-24,"treefactory.leaf_weights",()->{
-                var p=state.config().blockPalette();
-                double[][] choices={{.96,.02,.02},{.8,.15,.05},{.95,.05,0}};
-                int index=p.primaryWeight()==.96?1:p.primaryWeight()==.8?2:0;
-                state.update(state.config().withBlockPalette(p.withWeights(choices[index][0],choices[index][1],choices[index][2])));refresh();
-            });
-            var weightsNow=c.blockPalette();
-            weights.setMessage(Component.translatable("treefactory.leaf_weights",
-                    (int)Math.round(weightsNow.primaryWeight()*100),(int)Math.round(weightsNow.secondaryWeight()*100),
-                    (int)Math.round(weightsNow.accentWeight()*100)));
-            addContent(weights); y+=23;
-            }
+            Button materials=button(8,y-scroll,panel-16,"treefactory.choose_materials",()->{ materialsOpen=!materialsOpen; expanded=Panel.NONE; refresh(); });
+            materials.setMessage(Component.translatable("treefactory.choose_materials").append(materialsOpen?" ▶":" ▼"));
+            addContent(materials); y+=28;
             addContent(button(8,y-scroll,panel-16,"treefactory.new_seed",()->state.update(state.config().withSeed(new Random().nextLong())))); y+=28;
             EditBox name=new EditBox(font,8,y-scroll,panel-16,20,Component.translatable("treefactory.preset_name"));
             name.setMaxLength(64); name.setValue(presetName); name.setResponder(value->presetName=value); addContent(name); y+=23;
             addContent(button(8,y-scroll,panel-16,"treefactory.save",()->state.save(presetName))); y+=24;
             contentHeight=y-54;
         }
+        if(materialsOpen && !library) materials.init(font,materialLeft,materialWidth,height,w->materialWidgets.add(addWidget(w)),
+                ()->{ materialsOpen=false; refresh(); },this::refresh);
         int bounded=Math.clamp(scroll,0,Math.max(0,contentHeight-(height-106)));
         if(bounded!=scroll) {
             int shift=scroll-bounded;
@@ -137,23 +119,6 @@ public final class DrawerScreen extends Screen {
         return Button.builder(Component.translatable(key),b->action.run()).bounds(x,y,width,20).build();
     }
     private void toggle(Panel panel) { expanded=expanded==panel?Panel.NONE:panel; refresh(); }
-    private Button paletteButton(int y,String key,String current,String prefix,String suffix,int role) {
-        Button choice=button(16,y-scroll,panel-24,key,()->{
-            var p=state.config().blockPalette();
-            String next=nextBlock(current,prefix,suffix);
-            state.update(state.config().withBlockPalette(p.withBlocks(
-                    role==0?next:p.mainTrunk(),role==1?next:p.thickBranch(),role==2?next:p.thinBranch(),
-                    role==3?next:p.primaryLeaf(),role==4?next:p.secondaryLeaf(),role==5?next:p.accentBlock())));
-            refresh();
-        });
-        choice.setMessage(Component.translatable(key).append(": ").append(Component.translatable("block."+current.replace(':','.'))));
-        return choice;
-    }
-    private String nextBlock(String current,String prefix,String suffix) {
-        int index=-1;
-        for(int i=0;i<WOODS.length;i++) if(current.equals("minecraft:"+prefix+WOODS[i]+suffix)) index=i;
-        return "minecraft:"+prefix+WOODS[(index+1)%WOODS.length]+suffix;
-    }
     @Override public void extractRenderState(GuiGraphicsExtractor g,int mouseX,int mouseY,float delta) {
         g.fill(0,0,panel,height,0xF010201B); g.fill(panel-1,0,panel,height,0xFF4C876C);
         g.text(font,font.plainSubstrByWidth("Treefactory Light",panel-16),8,8,0xFFB8F8D2);
@@ -167,13 +132,16 @@ public final class DrawerScreen extends Screen {
             int y=53+(int)((track-thumb)*scroll/(double)Math.max(1,contentHeight-track));
             g.fill(panel-4,53,panel-2,height-55,0xFF274237); g.fill(panel-4,y,panel-2,y+thumb,0xFF83B99D);
         }
-        g.text(font,Component.translatable("treefactory.preview_hint"),panel+12,10,0xFFE2F5E9);
+        if(materialsOpen && !library) {
+            materials.render(g,font,mouseX,mouseY);
+            for(AbstractWidget widget:materialWidgets) widget.extractRenderState(g,mouseX,mouseY,delta);
+        } else g.text(font,Component.translatable("treefactory.preview_hint"),panel+12,10,0xFFE2F5E9);
         g.text(font,state.status(),panel+12,height-39,0xFF9CE7BD);
         BlockPos target=state.target();
         Component target_=target==null ? Component.translatable("treefactory.aim_first") : Component.translatable("treefactory.target", target.toShortString());
         g.text(font,target_,panel+12,height-24,target==null?0xFFFFC580:0xFFB5CDBF);
     }
-    private boolean insidePanel(double x) { return x<panel; }
+    private boolean insidePanel(double x) { return x<panel || (materialsOpen && !library && x<materialLeft+materialWidth); }
     private static final Set<KeyMapping> HELD=new HashSet<>();
     private void releaseMovement() {
         for(KeyMapping key:HELD) key.setDown(false);
@@ -208,6 +176,7 @@ public final class DrawerScreen extends Screen {
         InputConstants.releaseMouse(minecraft.getWindow(),lookX,lookY);
     }
     @Override public boolean mouseScrolled(double x,double y,double horizontal,double vertical) {
+        if(materialsOpen && !library && materials.scrolled(x,y,vertical)) return true;
         if(x<panel && y>=50 && y<height-51) {
             int next=Math.clamp(scroll-(int)(vertical*24),0,Math.max(0,contentHeight-(height-106)));
             int shift=scroll-next;
@@ -220,7 +189,11 @@ public final class DrawerScreen extends Screen {
         return super.mouseScrolled(x,y,horizontal,vertical);
     }
     @Override public boolean mouseClicked(MouseButtonEvent event,boolean doubleClick) {
-        if(insidePanel(event.x())) return super.mouseClicked(event,doubleClick);
+        if(insidePanel(event.x())) {
+            if(super.mouseClicked(event,doubleClick)) return true;
+            if(materialsOpen && !library && event.button()==InputConstants.MOUSE_BUTTON_LEFT && materials.click(event.x(),event.y())) return true;
+            return true;
+        }
         if(event.button()==InputConstants.MOUSE_BUTTON_RIGHT) { state.placeAtCursor(event.x(),event.y()); return true; }
         if(event.button()==InputConstants.MOUSE_BUTTON_MIDDLE) {
             looking=true;
