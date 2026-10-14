@@ -27,6 +27,15 @@ public final class Voxelizer {
             parents[node.parent()] = true;
             TreeNode parent = nodes.get(node.parent());
             double radius=Math.max(parent.radius(),node.radius());
+            if (config.preset()==TreePreset.WILLOW && config.fullness()>0
+                    && isDroopDrop(node,parent) && droopDepth(nodes,node)>=2) {
+                // Only the first step off the crown is bark; the rest of the hanging strand reads as
+                // leaves rather than a bare log curtain.
+                double leafRadius=Math.max(radius,.9);
+                fill(blocks,axes,parent.position(),node.position(),leafRadius,leafRadius,
+                        Material.PRIMARY_LEAF,Axis.Y,cancelled,config.seed(),config.blockPalette());
+                continue;
+            }
             double cap=Math.max(1.0,config.height()*.055);
             double lateral=Math.hypot(parent.position().x()-.5,parent.position().z()-.5);
             Material wood=parent.position().y()<config.height()*.36+1 && lateral<=cap+.8
@@ -47,6 +56,23 @@ public final class Voxelizer {
             }
         }
         return new VoxelData(Collections.unmodifiableMap(blocks),Collections.unmodifiableMap(axes));
+    }
+    /** True for the straight-down, same-column edges the willow tail-growth appends below each crown tip. */
+    private static boolean isDroopDrop(TreeNode node, TreeNode parent) {
+        return Math.abs(node.position().x()-parent.position().x())<1e-9
+                && Math.abs(node.position().z()-parent.position().z())<1e-9
+                && node.position().y()<parent.position().y()-.5;
+    }
+    /** How many consecutive drop-edges lead up to {@code node} from the crown tip it hangs off of. */
+    private static int droopDepth(List<TreeNode> nodes, TreeNode node) {
+        int depth=0;
+        TreeNode current=node;
+        while (current.parent()>=0) {
+            TreeNode parent=nodes.get(current.parent());
+            if (!isDroopDrop(current,parent)) break;
+            depth++; current=parent;
+        }
+        return depth;
     }
     private static double tipHash(int i,long seed) {
         long h=seed ^ (i*0x9E3779B97F4A7C15L); h=(h^(h>>>30))*0xBF58476D1CE4E5B9L; h=(h^(h>>>27))*0x94D049BB133111EBL;

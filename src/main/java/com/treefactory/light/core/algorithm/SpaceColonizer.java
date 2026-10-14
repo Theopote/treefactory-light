@@ -91,8 +91,10 @@ public final class SpaceColonizer {
                 Vector3 dir = sum[i].normalize().add(inertia.multiply(1.0)).add(new Vector3(0,droop?-.05:.14,0))
                         .add(perturb.multiply(config.crookedness()*.3)).normalize();
                 if(!droop && dir.y()<0) {
-                    if(Math.hypot(dir.x(),dir.z())<1e-6) dir=new Vector3(0,1,0);
-                    else dir=new Vector3(dir.x(),0,dir.z()).normalize();
+                    // Never descend, but do not flatten to an exact plane either: a small noise-driven rise.
+                    double h=Math.hypot(dir.x(),dir.z());
+                    double rise=.04+.14*Math.abs(perturb.y());
+                    dir = h<1e-6 ? new Vector3(0,1,0) : new Vector3(dir.x()/h,rise,dir.z()/h).normalize();
                 }
                 Vector3 next = p.add(dir.multiply(1.15));
                 if (next.y() < .5 || !occupied.add(quantize(next))) continue;

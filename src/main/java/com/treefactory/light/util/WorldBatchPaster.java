@@ -20,8 +20,10 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.storage.LevelResource;
 import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -35,8 +37,11 @@ public final class WorldBatchPaster {
     private static final int FLAGS = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE; // 2 | 16
     private static final int MAX_BUILDS = 4;
     private static final long THROTTLE_NS = 500_000_000L;
+    private static final long PERSIST_THROTTLE_NS = 2_000_000_000L; // batches frequent preview-footprint writes
     private static final int PLACE_RANGE = 128;
     private record CommittedTree(String dimension, Map<BlockPos,BlockState> placed, Map<BlockPos,BlockState> original) {}
+    private record PreviewSnapshot(UUID player, String dimension, boolean closing,
+                                    Map<BlockPos,BlockState> placed, Map<BlockPos,BlockState> original) {}
     private static final class Session {
         final ServerLevel level;
         final Map<BlockPos,BlockState> original = new HashMap<>();
@@ -52,8 +57,13 @@ public final class WorldBatchPaster {
     private final Map<UUID,Request> queued = new HashMap<>();
     private final Map<UUID,Long> lastPreview = new HashMap<>();
     private final Map<UUID,ArrayDeque<CommittedTree>> undo = new HashMap<>();
+    // Single background thread so writes to the save file are always serialized, never concurrent.
+    private final ExecutorService persistExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "treefactory-light-persist"); t.setDaemon(true); return t;
+    });
     private MinecraftServer server;
     private boolean dirty;
+    private long lastPersistNs;
     public static boolean holdingWand(ServerPlayer p) {
         return p.getMainHandItem().is(TreefactoryLight.TREE_WAND);
     }
@@ -110,7 +120,9 @@ public final class WorldBatchPaster {
             if (pending.containsKey(id)) continue;
             if (pending.size()>=MAX_BUILDS) return;
             Long last=lastPreview.get(id);
-            if (last!=null && System.nanoTime()-last<THROTTLE_NS) continue;
+            // A request pending commit must not be stuck behind the throttle: the player
+            // already closed the UI and nothing else will ever flush it.
+            if (!commitWhenDone.contains(id) && last!=null && System.nanoTime()-last<THROTTLE_NS) continue;
             Request request=queued.remove(id);
             if (request==null) continue;
             ServerPlayer player=server.getPlayerList().getPlayer(id);
@@ -122,14 +134,14 @@ public final class WorldBatchPaster {
         UUID id = player.getUUID();
         ServerLevel level = player.level();
         if(player.distanceToSqr(origin.getX()+.5,origin.getY()+.5,origin.getZ()+.5)>PLACE_RANGE*PLACE_RANGE) {
-            message(player,"treefactory.target_too_far"); return;
+            rejectPreview(player,"treefactory.target_too_far"); return;
         }
         String originProblem=inaccessibleReason(level,origin);
-        if(originProblem!=null) { message(player,originProblem); return; }
-        if(!level.mayInteract(player,origin)) { message(player,"treefactory.target_protected"); return; }
+        if(originProblem!=null) { rejectPreview(player,originProblem); return; }
+        if(!level.mayInteract(player,origin)) { rejectPreview(player,"treefactory.target_protected"); return; }
         final EnumMap<Voxelizer.Material,BlockState> materials;
         try { materials=palette(config); }
-        catch (IllegalArgumentException e) { message(player,"treefactory.invalid_palette"); return; }
+        catch (IllegalArgumentException e) { rejectPreview(player,"treefactory.invalid_palette"); return; }
         AtomicBoolean cancel = new AtomicBoolean();
         pending.put(id,cancel);
         lastPreview.put(id, System.nanoTime());
@@ -149,22 +161,33 @@ public final class WorldBatchPaster {
                 if (current==null || current.level()!=level || !authorized(current)) { discard(id); startQueued(); return; }
                 if (error!=null) { TreefactoryLight.LOGGER.warn("Tree generation failed",error); message(current,"treefactory.failed"); }
                 else apply(current,level,blocks);
-                if (commitWhenDone.remove(id) && error==null) commit(current);
+                // Let any newer request for this player (queued while this one was building) take over
+                // before committing, so a commit always applies to the latest preview, never a stale one.
                 startQueued();
+                if (commitWhenDone.contains(id) && !pending.containsKey(id) && !queued.containsKey(id) && error==null) {
+                    commitWhenDone.remove(id);
+                    commit(current);
+                }
             });
         });
+    }
+    /** A queued request that never reaches {@link #apply} (validation failure) must not strand a
+     * pending commit flag: fall back to committing whatever preview already exists, if any. */
+    private void rejectPreview(ServerPlayer player, String key) {
+        message(player,key);
+        if (commitWhenDone.remove(player.getUUID())) commit(player);
     }
     /** Keeps the current preview tree permanently (after any in-flight rebuild finishes). */
     public void commit(ServerPlayer player) {
         UUID id=player.getUUID();
-        if (pending.containsKey(id)) { commitWhenDone.add(id); return; }
+        if (pending.containsKey(id) || queued.containsKey(id)) { commitWhenDone.add(id); startQueued(); return; }
         Session session=sessions.remove(id);
         if (session==null) return;
         ArrayDeque<CommittedTree> stack=undo.computeIfAbsent(id, k -> new ArrayDeque<>());
         stack.addLast(new CommittedTree(session.level.dimension().identifier().toString(),
                 Map.copyOf(session.placed), Map.copyOf(session.original)));
         while (stack.size()>PlacementHistory.LIMIT) stack.removeFirst();
-        dirty=true; persist();
+        persist(true);
         player.sendSystemMessage(Component.translatable("treefactory.built",session.placed.size()),false);
     }
     public void undo(ServerPlayer player) {
@@ -184,7 +207,7 @@ public final class WorldBatchPaster {
             level.setBlock(pos, cell.getValue(), FLAGS);
             count++;
         }
-        dirty=true; persist();
+        persist(true);
         player.sendSystemMessage(Component.translatable("treefactory.undone",count),false);
     }
     /** Removes the preview tree and restores the world. */
@@ -198,7 +221,7 @@ public final class WorldBatchPaster {
         if (session.placed.isEmpty()) sessions.remove(id);
         dirty=true;
     }
-    public void disconnect(UUID id) { discard(id); persist(); }
+    public void disconnect(UUID id) { discard(id); persist(true); }
     public void attach(MinecraftServer server) {
         this.server=server;
         load();
@@ -207,7 +230,7 @@ public final class WorldBatchPaster {
             restoreAll(sessions.get(id));
             if (sessions.get(id)!=null && sessions.get(id).placed.isEmpty()) sessions.remove(id);
         }
-        persist();
+        persist(true);
     }
     public void stop() {
         pending.values().forEach(f -> f.set(true)); pending.clear(); commitWhenDone.clear(); queued.clear();
@@ -218,12 +241,17 @@ public final class WorldBatchPaster {
             restoreAll(session);
             if (session.placed.isEmpty()) sessions.remove(id);
         }
-        persist();
+        // Last chance to write before the process exits: block until the save actually lands on disk.
+        Future<?> finalWrite=persist(true);
+        if (finalWrite!=null) {
+            try { finalWrite.get(10, TimeUnit.SECONDS); }
+            catch (Exception e) { TreefactoryLight.LOGGER.warn("Timed out saving preview state on shutdown", e); }
+        }
         sessions.clear(); undo.clear(); server=null;
     }
     public void tick() {
         startQueued();
-        if (dirty) persist();
+        if (dirty) persist(false);
     }
     public void chunkLoaded(ServerLevel level, ChunkPos chunk) {
         boolean changed=false;
@@ -298,22 +326,45 @@ public final class WorldBatchPaster {
     private Path dataFile() {
         return server.getWorldPath(LevelResource.ROOT).resolve("treefactory_light.dat");
     }
-    private void persist() {
-        if (server==null) return;
+    /**
+     * Snapshots preview/undo state on the caller's thread (plain map copies only, no NBT/gzip work) and then
+     * does the expensive NBT build + gzip + file write off-thread on a single-threaded executor, so writes are
+     * never concurrent with each other. {@code immediate} bypasses the throttle (used by commit/undo/shutdown,
+     * which must not wait behind a routine preview-footprint save); {@link #tick()} always passes {@code false}
+     * so dragging a preview around does not serialize/gzip the whole file on every changed tick.
+     * Returns the scheduled write, or {@code null} if nothing was scheduled.
+     */
+    private Future<?> persist(boolean immediate) {
+        if (server==null) return null;
         dirty=false;
+        if (!immediate) {
+            long now=System.nanoTime();
+            if (now-lastPersistNs<PERSIST_THROTTLE_NS) { dirty=true; return null; }
+        }
+        lastPersistNs=System.nanoTime();
+        List<PreviewSnapshot> previews=new ArrayList<>();
+        sessions.forEach((id,session) -> previews.add(new PreviewSnapshot(id,
+                session.level.dimension().identifier().toString(), session.closing,
+                Map.copyOf(session.placed), Map.copyOf(session.original))));
+        Map<UUID,List<CommittedTree>> undoSnapshot=new LinkedHashMap<>();
+        undo.forEach((id,stack) -> undoSnapshot.put(id, List.copyOf(stack)));
+        Path target=dataFile();
+        return persistExecutor.submit(() -> writeToDisk(previews, undoSnapshot, target));
+    }
+    private static void writeToDisk(List<PreviewSnapshot> previews, Map<UUID,List<CommittedTree>> undoSnapshot, Path target) {
         CompoundTag root=new CompoundTag();
-        ListTag previews=new ListTag();
-        sessions.forEach((id,session) -> {
+        ListTag previewsTag=new ListTag();
+        for (PreviewSnapshot snapshot : previews) {
             CompoundTag tag=new CompoundTag();
-            tag.putString("player", id.toString());
-            tag.putString("dimension", session.level.dimension().identifier().toString());
-            tag.putBoolean("closing", session.closing);
-            tag.put("blocks", footprint(session.placed, session.original));
-            previews.add(tag);
-        });
-        root.put("previews", previews);
+            tag.putString("player", snapshot.player().toString());
+            tag.putString("dimension", snapshot.dimension());
+            tag.putBoolean("closing", snapshot.closing());
+            tag.put("blocks", footprint(snapshot.placed(), snapshot.original()));
+            previewsTag.add(tag);
+        }
+        root.put("previews", previewsTag);
         ListTag history=new ListTag();
-        undo.forEach((id,stack) -> {
+        undoSnapshot.forEach((id,stack) -> {
             CompoundTag tag=new CompoundTag();
             tag.putString("player", id.toString());
             ListTag entries=new ListTag();
@@ -328,7 +379,14 @@ public final class WorldBatchPaster {
             history.add(tag);
         });
         root.put("undo", history);
-        try { NbtIo.writeCompressed(root, dataFile()); }
+        // Write to a temp file and move it into place so a crash or power loss mid-write cannot leave
+        // a corrupted save (which would otherwise lose both the preview footprint and the undo history).
+        Path tmp=target.resolveSibling(target.getFileName().toString()+".tmp");
+        try {
+            NbtIo.writeCompressed(root, tmp);
+            try { Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE); }
+            catch (AtomicMoveNotSupportedException e) { Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING); }
+        }
         catch (IOException e) { TreefactoryLight.LOGGER.warn("Could not save preview state", e); }
     }
     private void load() {
