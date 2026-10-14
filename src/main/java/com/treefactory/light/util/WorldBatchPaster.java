@@ -126,7 +126,7 @@ public final class WorldBatchPaster {
             Request request=queued.remove(id);
             if (request==null) continue;
             ServerPlayer player=server.getPlayerList().getPlayer(id);
-            if (player==null || !authorized(player)) continue;
+            if (player==null || !authorized(player)) { commitWhenDone.remove(id); continue; }
             beginPreview(player, request.origin(), request.config());
         }
     }
@@ -164,7 +164,8 @@ public final class WorldBatchPaster {
                 // Let any newer request for this player (queued while this one was building) take over
                 // before committing, so a commit always applies to the latest preview, never a stale one.
                 startQueued();
-                if (commitWhenDone.contains(id) && !pending.containsKey(id) && !queued.containsKey(id) && error==null) {
+                // On error the flag must still be consumed; commit whatever preview already exists.
+                if (commitWhenDone.contains(id) && !pending.containsKey(id) && !queued.containsKey(id)) {
                     commitWhenDone.remove(id);
                     commit(current);
                 }
