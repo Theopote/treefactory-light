@@ -220,7 +220,7 @@ public final class DrawerScreen extends Screen {
         }
         return super.mouseScrolled(x,y,horizontal,vertical);
     }
-    @Override public boolean mouseClicked(MouseButtonEvent event,boolean doubleClick) {
+    @Override public boolean mouseClicked(@NonNull MouseButtonEvent event, boolean doubleClick) {
         if(menuPreset!=null) {
             var chosen=menuPreset; menuPreset=null;
             if(event.button()==InputConstants.MOUSE_BUTTON_LEFT && event.x()>=menuX && event.x()<menuX+MENU_W

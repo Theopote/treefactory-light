@@ -15,7 +15,7 @@ public final class PresetCardWidget extends Button {
         super(x,y,width,width,Component.literal(preset.name()),button->selected.run(),DEFAULT_NARRATION);
         this.preset=preset;
         Component name=preset.id().startsWith("builtin-")
-                ? Component.translatable("treefactory.builtin."+preset.config().preset().id())
+                ? Component.translatable("treefactory.builtin."+preset.id().substring("builtin-".length()))
                 : Component.literal(preset.name());
         setTooltip(Tooltip.create(name.copy().append("\n")
                 .append(Component.translatable("treefactory.preset."+preset.config().preset().id()))));

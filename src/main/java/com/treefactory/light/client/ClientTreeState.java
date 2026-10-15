@@ -30,10 +30,7 @@ public final class ClientTreeState {
     private BlockPos target;
     private boolean placeDirty, active;
     private long placeChangedAt;
-    private static final List<PresetStore.Preset> BUILT_IN_PRESETS=Arrays.stream(TreePreset.values())
-            .map(type->new PresetStore.Preset("builtin-"+type.id(),type.id(),"Treefactory Light",
-                    TreeConfig.defaults().withPreset(type)))
-            .toList();
+    private static final List<PresetStore.Preset> BUILT_IN_PRESETS=BuiltInPresets.all();
     private List<PresetStore.Preset> presets=BUILT_IN_PRESETS;
     private String status="";
     public TreeConfig config() { return config; }
