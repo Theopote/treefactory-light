@@ -41,20 +41,39 @@ final class MaterialPanel {
     private Role cachedRole; private String cachedQuery; private List<Block> cachedVisible=List.of();
     private DNAControlSlider secondarySlider, accentSlider;
 
+    private static final int TAB_HEIGHT=30;
+
+    /** Role tab drawn by hand so the block icon and the role name are both visible. */
+    private final class RoleTab extends Button {
+        private final Role tabRole; private final Font tabFont;
+        RoleTab(int x,int y,int w,int h,Role tabRole,Component label,Font font) {
+            super(x,y,w,h,label,b->{ role=tabRole; scroll=0; },DEFAULT_NARRATION);
+            this.tabRole=tabRole; this.tabFont=font;
+        }
+        @Override protected void extractContents(GuiGraphicsExtractor g,int mouseX,int mouseY,float delta) {
+            g.fill(getX(),getY(),getX()+width,getY()+height,isHovered()?0xFF234A40:0xFF14261F);
+            g.outline(getX(),getY(),width,height,tabRole==role?0xFF69DFB1:0xFF37584D);
+            block(idOf(tabRole,state.config().blockPalette())).ifPresent(b->g.item(new ItemStack(b),getX()+(width-16)/2,getY()+2));
+            String text=tabFont.plainSubstrByWidth(getMessage().getString(),width-2);
+            g.text(tabFont,text,getX()+(width-tabFont.width(text))/2,getY()+20,tabRole==role?0xFFE2F5E9:0xFF9CB8A9);
+        }
+    }
+
     static int widthFor(int screenWidth) { return Math.clamp(screenWidth/3,200,280); }
 
     void init(Font font,int left,int width,int height,Consumer<AbstractWidget> add,Runnable close,Runnable rebuild) {
-        this.x=left; this.width=width; this.height=height; this.gridTop=66; this.gridBottom=height-62;
+        this.x=left; this.width=width; this.height=height; this.gridTop=22+TAB_HEIGHT+24; this.gridBottom=height-62;
         this.rebuild=rebuild;
         add.accept(Button.builder(Component.literal("✕"),b->close.run()).bounds(left+width-26,4,20,16)
                 .tooltip(Tooltip.create(Component.translatable("treefactory.materials.close.tip"))).build());
         int tabW=(width-16)/ROLES.length;
         for(int i=0;i<ROLES.length;i++) {
             Role r=ROLES[i];
-            add.accept(Button.builder(Component.empty(),b->{ role=r; scroll=0; }).bounds(left+8+i*tabW,22,tabW-2,20)
-                    .tooltip(Tooltip.create(Component.translatable(ROLE_KEYS[i]).append("\n").append(Component.translatable("treefactory.materials.tab.tip")))).build());
+            RoleTab tab=new RoleTab(left+8+i*tabW,22,tabW-2,TAB_HEIGHT,r,Component.translatable(ROLE_KEYS[i]),font);
+            tab.setTooltip(Tooltip.create(Component.translatable(ROLE_KEYS[i]).append("\n").append(Component.translatable("treefactory.materials.tab.tip"))));
+            add.accept(tab);
         }
-        EditBox search=new EditBox(font,left+8,46,width-16,16,Component.translatable("treefactory.materials.search"));
+        EditBox search=new EditBox(font,left+8,22+TAB_HEIGHT+4,width-16,16,Component.translatable("treefactory.materials.search"));
         search.setHint(Component.translatable("treefactory.materials.search"));
         search.setTooltip(Tooltip.create(Component.translatable("treefactory.materials.search.tip")));
         search.setMaxLength(48); search.setValue(rawQuery);
@@ -122,12 +141,6 @@ final class MaterialPanel {
     void render(GuiGraphicsExtractor g,Font font,int mouseX,int mouseY) {
         g.fill(x,0,x+width,height,0xF00B1814); g.fill(x+width-1,0,x+width,height,0xFF4C876C);
         g.text(font,Component.translatable("treefactory.materials.title"),x+8,8,0xFFB8F8D2);
-        int tabW=(width-16)/ROLES.length;
-        for(int i=0;i<ROLES.length;i++) {
-            int tx=x+8+i*tabW;
-            if(ROLES[i]==role) g.outline(tx,22,tabW-2,20,0xFF69DFB1);
-            block(idOf(ROLES[i],state.config().blockPalette())).ifPresent(b->g.item(new ItemStack(b),tx+(tabW-2-16)/2,24));
-        }
         List<Block> blocks=visible();
         scroll=Math.clamp(scroll,0,maxScroll(blocks.size()));
         String current=idOf(role,state.config().blockPalette());

@@ -55,7 +55,7 @@
   "treefactory.role.primary_leaf": "Leaves",
   "treefactory.role.secondary_leaf": "Leaves 2",
   "treefactory.role.accent": "Accent",
-  "treefactory.new_seed": "Randomize seed",
+  "treefactory.new_seed": "Random seed",
   "treefactory.generating": "Growing tree…",
   "treefactory.preview_count": "Preview: %s blocks · actual %s×%s×%s",
   "treefactory.preview_hint": "Right-click ground to place · Hold middle mouse to look · Esc cancels",

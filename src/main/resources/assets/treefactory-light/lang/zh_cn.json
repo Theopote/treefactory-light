@@ -55,7 +55,7 @@
   "treefactory.role.primary_leaf": "树叶",
   "treefactory.role.secondary_leaf": "副叶",
   "treefactory.role.accent": "装饰",
-  "treefactory.new_seed": "更换随机种子",
+  "treefactory.new_seed": "随机种子",
   "treefactory.generating": "正在生成树木…",
   "treefactory.preview_count": "预览：%s 格 · 实际 %s×%s×%s",
   "treefactory.preview_hint": "右键地面放置 · 按住中键转动视角 · Esc 取消",
