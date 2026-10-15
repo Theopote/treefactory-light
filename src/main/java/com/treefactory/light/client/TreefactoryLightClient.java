@@ -20,7 +20,7 @@ public class TreefactoryLightClient implements ClientModInitializer {
 			ClientTreeState.INSTANCE.tick();
 			while (UNDO.consumeClick()) ClientTreeState.INSTANCE.undo();
 		});
-		ClientPlayConnectionEvents.DISCONNECT.register((handler,client) -> ClientTreeState.INSTANCE.disconnect());
+		ClientPlayConnectionEvents.DISCONNECT.register((handler,client) -> client.execute(ClientTreeState.INSTANCE::disconnect));
 		PictureInPictureRendererRegistry.register(context -> new TreePictureRenderer());
 	}
 }
