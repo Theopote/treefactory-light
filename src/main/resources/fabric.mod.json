@@ -5,7 +5,7 @@
 	"name": "Treefactory Light",
 	"description": "Procedural trees with live previews, presets and undo. Beta for creative builders.",
 	"authors": ["Treefactory Light"],
-	"license": "CC0-1.0",
+	"license": "MIT",
 	"icon": "assets/treefactory-light/icon.png",
 	"environment": "*",
 	"entrypoints": {
