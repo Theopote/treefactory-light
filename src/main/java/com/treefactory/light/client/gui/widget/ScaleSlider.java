@@ -2,6 +2,7 @@ package com.treefactory.light.client.gui.widget;
 
 import com.treefactory.light.core.config.TreeConfig;
 import net.minecraft.client.gui.components.AbstractSliderButton;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.network.chat.Component;
 import java.util.function.DoubleConsumer;
 
@@ -12,6 +13,7 @@ public final class ScaleSlider extends AbstractSliderButton {
     public ScaleSlider(int x,int y,int width,double height,DoubleConsumer changed) {
         super(x,y,width,20,Component.empty(),(height-MIN)/(MAX-MIN));
         this.changed=changed; updateMessage();
+        setTooltip(Tooltip.create(Component.translatable("treefactory.size.tip")));
     }
     private double height() { return MIN+value*(MAX-MIN); }
     @Override protected void updateMessage() {

@@ -45,7 +45,7 @@ public final class DrawerScreen extends Screen {
         fixed.add(addWidget(button(8,24,(panel-20)/2,"treefactory.generator",()->{library=false;scroll=0;refresh();})));
         fixed.add(addWidget(button(12+(panel-20)/2,24,(panel-20)/2,"treefactory.library",()->{library=true;scroll=0;refresh();})));
         int half=Math.max(1,(panel-18)/2);
-        fixed.add(addWidget(button(8,height-24,half,"treefactory.undo",()->state.undo())));
+        fixed.add(addWidget(button(8,height-24,half,"treefactory.undo", state::undo)));
         fixed.add(addWidget(button(10+half,height-24,half,"treefactory.done",()->{ if(state.finish()) onClose(); })));
         if(library) {
             int gap=6, tile=Math.max(1,Math.min((panel-16-gap)/2,height-108)), y=54;
@@ -115,8 +115,12 @@ public final class DrawerScreen extends Screen {
     private boolean inContentViewport(AbstractWidget widget) {
         return widget.getY()<height-51 && widget.getY()+widget.getHeight()>50;
     }
+    private static final java.util.Set<String> TIPPED=java.util.Set.of("treefactory.generator","treefactory.library","treefactory.undo",
+            "treefactory.done","treefactory.choose_shape","treefactory.choose_materials","treefactory.new_seed","treefactory.save");
     private Button button(int x,int y,int width,String key,Runnable action) {
-        return Button.builder(Component.translatable(key),b->action.run()).bounds(x,y,width,20).build();
+        Button b=Button.builder(Component.translatable(key),btn->action.run()).bounds(x,y,width,20).build();
+        if(TIPPED.contains(key)) b.setTooltip(net.minecraft.client.gui.components.Tooltip.create(Component.translatable(key+".tip")));
+        return b;
     }
     private void toggle(Panel panel) { expanded=expanded==panel?Panel.NONE:panel; refresh(); }
     @Override public void extractRenderState(GuiGraphicsExtractor g,int mouseX,int mouseY,float delta) {
@@ -156,13 +160,13 @@ public final class DrawerScreen extends Screen {
         if(insidePanel(x)) releaseMovement();
         super.mouseMoved(x,y);
     }
-    @Override public boolean keyPressed(KeyEvent event) {
+    @Override public boolean keyPressed(@NonNull KeyEvent event) {
         if(!insidePanel(mouseX) && !(getFocused() instanceof EditBox) && event.key()!=InputConstants.KEY_ESCAPE) {
             for(KeyMapping key:movementKeys()) if(key.matches(event)) { key.setDown(true); HELD.add(key); return true; }
         }
         return super.keyPressed(event);
     }
-    @Override public boolean keyReleased(KeyEvent event) {
+    @Override public boolean keyReleased(@NonNull KeyEvent event) {
         for(KeyMapping key:movementKeys()) if(key.matches(event)) { key.setDown(false); HELD.remove(key); }
         return super.keyReleased(event);
     }

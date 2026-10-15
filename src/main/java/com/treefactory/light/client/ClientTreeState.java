@@ -160,7 +160,9 @@ public final class ClientTreeState {
     public void disconnect() {
         revision.incrementAndGet(); preview=null;         dirty=true; target=null; active=false; placeDirty=false; presets=BUILT_IN_PRESETS;
         ThumbnailFBOMaker.clear();
+        sessionEpoch++;
     }
+    public static volatile int sessionEpoch;
     public static void toast(String key) {
         if(Minecraft.getInstance().player!=null) Minecraft.getInstance().player.sendOverlayMessage(Component.translatable(key));
     }
