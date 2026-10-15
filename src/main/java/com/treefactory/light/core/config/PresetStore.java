@@ -28,6 +28,11 @@ public final class PresetStore {
         } finally { Files.deleteIfExists(temporary); }
         return new Preset(id,name,author,config);
     }
+    public void delete(String id) throws IOException {
+        Path thumbnail=thumbnail(id);
+        Files.deleteIfExists(directory.resolve(id+".json"));
+        Files.deleteIfExists(thumbnail);
+    }
     public List<Preset> loadAll(java.util.function.Consumer<String> warning) throws IOException {
         if (!Files.isDirectory(directory)) return List.of();
         List<Preset> presets = new ArrayList<>();

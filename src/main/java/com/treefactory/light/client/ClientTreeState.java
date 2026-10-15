@@ -157,6 +157,17 @@ public final class ClientTreeState {
             toast("treefactory.saved"); refreshLibrary();
         }));
     }
+    public void delete(PresetStore.Preset preset) {
+        if(preset.id().startsWith("builtin-")) return;
+        CompletableFuture.runAsync(()-> {
+            try { store.delete(preset.id()); }
+            catch(Exception e) { throw new CompletionException(e); }
+        }).whenComplete((unused,error)->Minecraft.getInstance().execute(()-> {
+            if(error!=null) { toast("treefactory.delete_failed"); TreefactoryLight.LOGGER.warn("Preset delete failed",error); }
+            else toast("treefactory.deleted");
+            refreshLibrary();
+        }));
+    }
     public void disconnect() {
         revision.incrementAndGet(); preview=null;         dirty=true; target=null; active=false; placeDirty=false; presets=BUILT_IN_PRESETS;
         ThumbnailFBOMaker.clear();

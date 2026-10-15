@@ -27,6 +27,12 @@ public final class DrawerScreen extends Screen {
     private boolean materialsOpen;
     private int materialLeft,materialWidth;
     private boolean looking;
+    private final Map<AbstractWidget,PresetStore.Preset> cards=new HashMap<>();
+    private final List<ShapeButton> shapeButtons=new ArrayList<>();
+    private PresetStore.Preset menuPreset;
+    private int menuX,menuY;
+    private static final int MENU_W=70, MENU_H=18;
+    private static Boolean previousHideGui;
     private double mouseX,lookX,lookY;
     private String presetName="My tree";
     private static final CanopyShape[] SHAPE_ORDER={
@@ -42,7 +48,8 @@ public final class DrawerScreen extends Screen {
     private int bottom() { return height-28; }
     private int viewport() { return Math.max(0,bottom()-TOP); }
     @Override protected void init() {
-        panel=Math.max(64,width/4); content.clear(); fixed.clear(); materialWidgets.clear();
+        panel=Math.max(64,width/4); content.clear(); fixed.clear(); materialWidgets.clear(); cards.clear(); menuPreset=null; shapeButtons.clear();
+        if(previousHideGui==null) { previousHideGui=minecraft.gui.hud.isHidden(); if(!previousHideGui) minecraft.gui.hud.toggle(); }
         materialWidth=MaterialPanel.widthFor(width); materialLeft=panel;
         int w=panel-2*M-3, half=Math.max(1,(w-2)/2);
         fixed.add(addWidget(button(M,TITLE_H+4,half,"treefactory.generator",()->{library=false;scroll=0;refresh();})));
@@ -57,9 +64,11 @@ public final class DrawerScreen extends Screen {
             for(int i=0;i<presets.size();i++) {
                 var preset=presets.get(i);
                 int x=M+(i%2)*(tile+gap), top=y+(i/2)*(tile+gap)-scroll;
-                addContent(new PresetCardWidget(x,top,tile,preset,()->{
+                var card=new PresetCardWidget(x,top,tile,preset,()->{
                     if(state.update(preset.config())) refresh();
-                }));
+                });
+                cards.put(card,preset);
+                addContent(card);
             }
         } else {
             TreeConfig c=state.config(); int y=TOP;
@@ -67,17 +76,19 @@ public final class DrawerScreen extends Screen {
             addContent(new DNAControlSlider(M,y-scroll,w,"treefactory.crookedness",c.crookedness(),v->state.update(state.config().withDna(v,state.config().spread(),state.config().fullness())))); y+=22;
             addContent(new DNAControlSlider(M,y-scroll,w,"treefactory.spread",c.spread(),v->state.update(state.config().withDna(state.config().crookedness(),v,state.config().fullness())))); y+=22;
             addContent(new DNAControlSlider(M,y-scroll,w,"treefactory.fullness",c.fullness(),v->state.update(state.config().withDna(state.config().crookedness(),state.config().spread(),v)))); y+=24;
-            Button shapes=button(M,y-scroll,w,"treefactory.choose_shape",()->toggle(Panel.SHAPES));
-            shapes.setMessage(Component.translatable("treefactory.choose_shape").append(": ")
-                    .append(Component.translatable("treefactory.canopy."+c.canopyShape().name().toLowerCase(Locale.ROOT)))
-                    .append(expanded==Panel.SHAPES?" ▲":" ▼"));
+            Component shapeName=Component.translatable("treefactory.canopy."+c.canopyShape().name().toLowerCase(Locale.ROOT))
+                    .append(expanded==Panel.SHAPES?" ▲":" ▼");
+            ShapeButton shapes=new ShapeButton(M,y-scroll,w,shapeName,c.canopyShape(),()->toggle(Panel.SHAPES));
+            shapes.setTooltip(Tooltip.create(Component.translatable("treefactory.choose_shape.tip")));
             addContent(shapes); y+=22;
             if(expanded==Panel.SHAPES) for(CanopyShape shape:SHAPE_ORDER) {
-                Button choice=button(M+8,y-scroll,w-8,"treefactory.canopy."+shape.name().toLowerCase(Locale.ROOT),()->{
+                Component label=Component.translatable("treefactory.canopy."+shape.name().toLowerCase(Locale.ROOT));
+                if(c.canopyShape()==shape) label=Component.literal("✓ ").append(label);
+                ShapeButton choice=new ShapeButton(M+8,y-scroll,w-8,label,shape,()->{
                     TreeConfig now=state.config(); state.update(now.withCanopy(shape,now.canopyScale(),now.attractionDensity()));
                     expanded=Panel.NONE; refresh();
                 });
-                if(c.canopyShape()==shape) choice.setMessage(Component.literal("✓ ").append(choice.getMessage()));
+                shapeButtons.add(choice);
                 addContent(choice); y+=22;
             }
             addContent(new DNAControlSlider(M,y-scroll,w,"treefactory.canopy_scale",(c.canopyScale()-.75)/1.25,
@@ -139,9 +150,32 @@ public final class DrawerScreen extends Screen {
             materials.render(g,font,mouseX,mouseY);
             for(AbstractWidget widget:materialWidgets) widget.extractRenderState(g,mouseX,mouseY,delta);
         }
-        int infoX=(materialsOpen && !library ? materialLeft+materialWidth : panel)+10;
-        Component info=Component.literal(state.status()).append("  ·  ").append(Component.translatable("treefactory.preview_hint"));
-        g.text(font,info,infoX,6,0xFFE2F5E9);
+        if(!library && !materialsOpen && expanded==Panel.SHAPES) {
+            CanopyShape shown=state.config().canopyShape();
+            for(ShapeButton b:shapeButtons) {
+                if(b.visible && mouseX>=b.getX() && mouseX<b.getX()+b.getWidth() && mouseY>=TOP && mouseY<bottom()
+                        && mouseY>=b.getY() && mouseY<b.getY()+b.getHeight()) shown=b.shape();
+            }
+            ShapeIcons.drawFramed(g,shown,panel+12,28,64);
+            Component name=Component.translatable("treefactory.canopy."+shown.name().toLowerCase(Locale.ROOT));
+            g.text(font,name,panel+12,28+64+8,0xFFE2F5E9);
+        }
+        if(menuPreset!=null) {
+            boolean over=mouseX>=menuX && mouseX<menuX+MENU_W && mouseY>=menuY && mouseY<menuY+MENU_H;
+            g.fill(menuX,menuY,menuX+MENU_W,menuY+MENU_H,over?0xFF5A2A2A:0xFF2A1F1F);
+            g.outline(menuX,menuY,MENU_W,MENU_H,0xFFB86A6A);
+            Component label=Component.translatable("treefactory.delete");
+            g.text(font,label,menuX+(MENU_W-font.width(label))/2,menuY+5,0xFFFFD0D0);
+        }
+        Component info=Component.literal(state.status());
+        g.text(font,info,width-10-font.width(info),height-14,0xFF9CE7BD);
+        Component hint=Component.translatable("treefactory.preview_hint");
+        g.text(font,hint,(materialsOpen && !library ? materialLeft+materialWidth : panel)+10,6,0xFFE2F5E9);
+    }
+    @Override public void removed() {
+        if(previousHideGui!=null) { if(!previousHideGui && minecraft.gui.hud.isHidden()) minecraft.gui.hud.toggle(); previousHideGui=null; }
+        releaseMovement(); endLook();
+        super.removed();
     }
     private boolean insidePanel(double x) { return x<panel || (materialsOpen && !library && x<materialLeft+materialWidth); }
     private static final Set<KeyMapping> HELD=new HashSet<>();
@@ -168,10 +202,6 @@ public final class DrawerScreen extends Screen {
         for(KeyMapping key:movementKeys()) if(key.matches(event)) { key.setDown(false); HELD.remove(key); }
         return super.keyReleased(event);
     }
-    @Override public void removed() {
-        releaseMovement(); endLook();
-        super.removed();
-    }
     private void endLook() {
         if(!looking) return;
         looking=false;
@@ -191,6 +221,21 @@ public final class DrawerScreen extends Screen {
         return super.mouseScrolled(x,y,horizontal,vertical);
     }
     @Override public boolean mouseClicked(MouseButtonEvent event,boolean doubleClick) {
+        if(menuPreset!=null) {
+            var chosen=menuPreset; menuPreset=null;
+            if(event.button()==InputConstants.MOUSE_BUTTON_LEFT && event.x()>=menuX && event.x()<menuX+MENU_W
+                    && event.y()>=menuY && event.y()<menuY+MENU_H) { state.delete(chosen); return true; }
+        }
+        if(library && event.button()==InputConstants.MOUSE_BUTTON_RIGHT && event.x()<panel
+                && event.y()>=TOP && event.y()<bottom()) {
+            for(var card:cards.entrySet()) {
+                if(card.getKey().visible && card.getKey().isMouseOver(event.x(),event.y()) && !card.getValue().id().startsWith("builtin-")) {
+                    menuPreset=card.getValue();
+                    menuX=Math.min((int)event.x(),width-MENU_W); menuY=Math.min((int)event.y(),height-MENU_H);
+                    return true;
+                }
+            }
+        }
         if(insidePanel(event.x())) {
             if(super.mouseClicked(event,doubleClick)) return true;
             if(materialsOpen && !library && event.button()==InputConstants.MOUSE_BUTTON_LEFT && materials.click(event.x(),event.y())) return true;
