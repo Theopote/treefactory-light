@@ -11,6 +11,15 @@ public final class SpaceColonizer {
     public static final int MAX_WILLOW_NODES = 5000;
     public static final int MAX_ITERATIONS = 160;
 
+    /** Lowest normalized y (-1..1) inside the shape along its axis; hemispheres start at 0, not -1. */
+    private static double lowestY(TreeConfig config) {
+        for (int i=0;i<=200;i++) {
+            double y=-1+i*.01;
+            if (config.canopyShape().field(0,y,0,config.crownLayers())<=0) return y;
+        }
+        return -1;
+    }
+
     public List<TreeNode> generate(TreeConfig config) { return generate(config, () -> false); }
 
     public List<TreeNode> generate(TreeConfig config, BooleanSupplier cancelled) {
@@ -20,8 +29,9 @@ public final class SpaceColonizer {
         double width = height * (.22 + .38 * config.spread()) * config.canopyScale();
         double halfHeight = height * .38 * config.canopyScale() * config.crownStretch();
         double crownCenter = config.canopyShape()==CanopyShape.SPHERE ? Math.max(height*.76,width+2) : height*.76;
-        // Stretch grows the crown upward only: the bottom edge stays where it is at stretch 1.
-        if (config.canopyShape()!=CanopyShape.SPHERE) crownCenter += height*.38*config.canopyScale()*(config.crownStretch()-1);
+        // Stretch grows the crown upward only: the lowest point of the shape stays where it is at stretch 1.
+        if (config.canopyShape()!=CanopyShape.SPHERE)
+            crownCenter -= lowestY(config)*height*.38*config.canopyScale()*(config.crownStretch()-1);
         double leanAngle = random.nextDouble()*Math.PI*2;
         double leanMag = height*.05*(.3+config.crookedness()*1.4);
         double trunkTop = Math.max(2,height*.36);

@@ -160,16 +160,6 @@ public final class DrawerScreen extends Screen {
             materials.render(g,font,mouseX,mouseY);
             for(AbstractWidget widget:materialWidgets) widget.extractRenderState(g,mouseX,mouseY,delta);
         }
-        if(!library && !materialsOpen && expanded==Panel.SHAPES) {
-            CanopyShape shown=state.config().canopyShape();
-            for(ShapeButton b:shapeButtons) {
-                if(b.visible && mouseX>=b.getX() && mouseX<b.getX()+b.getWidth() && mouseY>=TOP && mouseY<bottom()
-                        && mouseY>=b.getY() && mouseY<b.getY()+b.getHeight()) shown=b.shape();
-            }
-            ShapeIcons.drawFramed(g,shown,panel+12,28,64);
-            Component name=Component.translatable("treefactory.canopy."+shown.name().toLowerCase(Locale.ROOT));
-            g.text(font,name,panel+12,28+64+8,0xFFE2F5E9);
-        }
         if(menuPreset!=null) {
             boolean over=mouseX>=menuX && mouseX<menuX+MENU_W && mouseY>=menuY && mouseY<menuY+MENU_H;
             g.fill(menuX,menuY,menuX+MENU_W,menuY+MENU_H,over?0xFF5A2A2A:0xFF2A1F1F);
