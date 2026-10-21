@@ -32,16 +32,8 @@ public enum CanopyShape implements ICanopyShape {
         public double field(double x,double y,double z) { return Math.max(x*x+y*y+z*z-1,-y); }
     },
     SPINDLE_MULTI_LAYER {
-        public double field(double x,double y,double z) {
-            double best=Double.POSITIVE_INFINITY;
-            double[] heights={-.58,0,.58}, radii={.92,1,.72};
-            for(int i=0;i<3;i++) {
-                double radial=(x*x+z*z)/(radii[i]*radii[i]);
-                double vertical=(y-heights[i])/.23;
-                best=Math.min(best,radial+vertical*vertical-1);
-            }
-            return best;
-        }
+        public double field(double x,double y,double z) { return layeredField(x,y,z,3); }
+        @Override public double field(double x,double y,double z,int layers) { return layeredField(x,y,z,layers); }
     },
     SPINDLE {
         public double field(double x,double y,double z) {
@@ -85,6 +77,22 @@ public enum CanopyShape implements ICanopyShape {
             return Math.max(Math.abs(y)-1,Math.hypot(x,z)-radius);
         }
     };
+    /** Shapes other than the layered spindle ignore the layer count. */
+    public double field(double x,double y,double z,int layers) { return field(x,y,z); }
+    /** Vertical stretch applies to every shape except the sphere. */
+    public boolean stretchable() { return this!=SPHERE; }
+    public boolean layered() { return this==SPINDLE_MULTI_LAYER; }
+    private static double layeredField(double x,double y,double z,int layers) {
+        int n=Math.max(2,layers);
+        double spacing=1.16/(n-1), thickness=.4*spacing, best=Double.POSITIVE_INFINITY;
+        for(int i=0;i<n;i++) {
+            double t=i/(double)(n-1), radius=.72+.28*Math.sin(Math.PI*t);
+            double radial=(x*x+z*z)/(radius*radius);
+            double vertical=(y-(-.58+i*spacing))/thickness;
+            best=Math.min(best,radial+vertical*vertical-1);
+        }
+        return best;
+    }
     private static double ovalField(double x,double y,double z,double peak) {
         double t=(y+1)*.5;
         if(t<0 || t>1) return Math.abs(y)-1;

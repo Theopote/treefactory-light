@@ -95,6 +95,14 @@ public final class DrawerScreen extends Screen {
                     v->{TreeConfig now=state.config();state.update(now.withCanopy(now.canopyShape(),.75+1.25*v,now.attractionDensity()));})); y+=22;
             addContent(new DNAControlSlider(M,y-scroll,w,"treefactory.attraction_density",(c.attractionDensity()-.5)/1.5,
                     v->{TreeConfig now=state.config();state.update(now.withCanopy(now.canopyShape(),now.canopyScale(),.5+1.5*v));})); y+=22;
+            if(c.canopyShape().stretchable()) {
+                addContent(new DNAControlSlider(M,y-scroll,w,"treefactory.crown_stretch",c.crownStretch()-.6,
+                        v->state.update(state.config().withCrownStretch(.6+v)))); y+=22;
+            }
+            if(c.canopyShape().layered()) {
+                addContent(new DNAControlSlider(M,y-scroll,w,"treefactory.crown_layers",(c.crownLayers()-3)/3.0,
+                        v->state.update(state.config().withCrownLayers(3+(int)Math.round(3*v))))); y+=22;
+            }
             addContent(new DNAControlSlider(M,y-scroll,w,"treefactory.pipe_exponent",(c.pipeExponent()-2.5)/.5,
                     v->state.update(state.config().withPipeExponent(2.5+.5*v)))); y+=22;
             addContent(new DNAControlSlider(M,y-scroll,w,"treefactory.trunk_thickness",(c.trunkThickness()-.5)/1.5,

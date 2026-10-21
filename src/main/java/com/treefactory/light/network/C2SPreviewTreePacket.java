@@ -14,6 +14,7 @@ public record C2SPreviewTreePacket(BlockPos origin, TreeConfig config) implement
         b.writeBlockPos(origin); writeEnum(b,config.preset()); writeEnum(b,config.scale()); b.writeDouble(config.height()); b.writeLong(config.seed());
         b.writeDouble(config.crookedness()); b.writeDouble(config.spread()); b.writeDouble(config.fullness());
         writeEnum(b,config.canopyShape()); b.writeDouble(config.canopyScale()); b.writeDouble(config.attractionDensity()); b.writeDouble(config.pipeExponent()); b.writeDouble(config.trunkThickness());
+        b.writeDouble(config.crownStretch()); b.writeVarInt(config.crownLayers());
         var p=config.blockPalette();
         b.writeUtf(p.mainTrunk(),128); b.writeUtf(p.thickBranch(),128); b.writeUtf(p.thinBranch(),128);
         b.writeUtf(p.primaryLeaf(),128); b.writeUtf(p.secondaryLeaf(),128); b.writeUtf(p.accentBlock(),128);
@@ -23,9 +24,10 @@ public record C2SPreviewTreePacket(BlockPos origin, TreeConfig config) implement
         BlockPos origin=b.readBlockPos(); TreePreset preset=readEnum(b,TreePreset.class); TreeScale scale=readEnum(b,TreeScale.class); double height=b.readDouble();
         long seed=b.readLong(); double crooked=b.readDouble(), spread=b.readDouble(), fullness=b.readDouble();
         CanopyShape shape=readEnum(b,CanopyShape.class); double crownScale=b.readDouble(), density=b.readDouble(), exponent=b.readDouble(), thickness=b.readDouble();
+        double stretch=b.readDouble(); int layers=b.readVarInt();
         BlockPalette palette=new BlockPalette(b.readUtf(128),b.readUtf(128),b.readUtf(128),b.readUtf(128),b.readUtf(128),b.readUtf(128),
                 b.readDouble(),b.readDouble(),b.readDouble());
-        return new C2SPreviewTreePacket(origin,new TreeConfig(preset,scale,seed,crooked,spread,fullness,shape,crownScale,density,exponent,palette,height,thickness));
+        return new C2SPreviewTreePacket(origin,new TreeConfig(preset,scale,seed,crooked,spread,fullness,shape,crownScale,density,exponent,palette,height,thickness,stretch,layers));
     }
     private static <E extends Enum<E>> void writeEnum(RegistryFriendlyByteBuf b, E value) {
         b.writeById(Enum::ordinal, value);
