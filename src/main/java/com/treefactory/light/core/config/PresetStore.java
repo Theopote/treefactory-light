@@ -66,7 +66,7 @@ public final class PresetStore {
         JsonObject canopy=new JsonObject();
         canopy.addProperty("shape",c.canopyShape().name().toLowerCase(Locale.ROOT));
         canopy.addProperty("scale",c.canopyScale()); canopy.addProperty("density",c.attractionDensity());
-        canopy.addProperty("pipe_exponent",c.pipeExponent()); root.add("canopy",canopy);
+        canopy.addProperty("pipe_exponent",c.pipeExponent()); canopy.addProperty("trunk_thickness",c.trunkThickness()); root.add("canopy",canopy);
         JsonObject palette = new JsonObject();
         BlockPalette p=c.blockPalette();
         palette.addProperty("log_block",p.mainTrunk()); palette.addProperty("leaves_block",p.primaryLeaf());
@@ -98,7 +98,8 @@ public final class PresetStore {
         double height=root.has("height")?root.get("height").getAsDouble():legacy.height();
         TreeConfig config=new TreeConfig(type,legacy.scale(),legacy.seed(),legacy.crookedness(),legacy.spread(),legacy.fullness(),
                 CanopyShape.valueOf(canopy.get("shape").getAsString().toUpperCase(Locale.ROOT)),canopy.get("scale").getAsDouble(),
-                canopy.get("density").getAsDouble(),canopy.get("pipe_exponent").getAsDouble(),blocks,height);
+                canopy.get("density").getAsDouble(),canopy.get("pipe_exponent").getAsDouble(),blocks,height,
+                canopy.has("trunk_thickness")?canopy.get("trunk_thickness").getAsDouble():1.0);
         return new Preset(id,name,author,config);
     }
 }

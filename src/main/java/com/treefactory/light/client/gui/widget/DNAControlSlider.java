@@ -18,6 +18,7 @@ public final class DNAControlSlider extends AbstractSliderButton {
             case "treefactory.canopy_scale" -> String.format(Locale.ROOT,"%.2f",.75+1.25*value);
             case "treefactory.attraction_density" -> String.format(Locale.ROOT,"%.2f",.5+1.5*value);
             case "treefactory.pipe_exponent" -> String.format(Locale.ROOT,"%.2f",2.5+.5*value);
+            case "treefactory.trunk_thickness" -> String.format(Locale.ROOT,"%.2f",.5+1.5*value);
             default -> (int)Math.round(value*100);
         };
         setMessage(Component.translatable(key,shown));

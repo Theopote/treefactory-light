@@ -15,7 +15,7 @@ public final class PipeModelEngine {
      */
     private static final double SOFT_START = .55, LENGTH_WEIGHT = .6, GAMMA = .8;
     public List<TreeNode> apply(List<TreeNode> skeleton, TreeConfig config) {
-        double cap=Math.max(1.0,config.height()*.055), e=config.pipeExponent();
+        double cap=Math.max(1.0,config.height()*.055), e=config.pipeExponent(), t=config.trunkThickness();
         int n=skeleton.size();
         double[] sums=new double[n], raw=new double[n]; int[] h=new int[n];
         for (int i=n-1;i>=0;i--) {
@@ -31,8 +31,8 @@ public final class PipeModelEngine {
             double len  = .5+(cap-.5)*Math.pow(h[i]/hRoot,GAMMA);
             double r = (1-LENGTH_WEIGHT)*pipe + LENGTH_WEIGHT*len;
             TreeNode node=skeleton.get(i);
-            if (node.parent()>=0) r=Math.min(r,fin[node.parent()]);
-            fin[i]=Math.max(.5,Math.min(cap,r)); out.set(i,node.withRadius(fin[i]));
+            if (node.parent()>=0) r=Math.min(r,fin[node.parent()]/t);
+            fin[i]=Math.max(.5,Math.min(cap*t,r*t)); out.set(i,node.withRadius(fin[i]));
         }
         return List.copyOf(out);
     }

@@ -32,6 +32,8 @@
   "treefactory.canopy_scale": "Canopy range ×%s",
   "treefactory.attraction_density": "Attractor density ×%s",
   "treefactory.pipe_exponent": "Pipe exponent %s",
+  "treefactory.trunk_thickness": "Trunk thickness x%s",
+  "treefactory.trunk_thickness.tip": "Scales trunk and branch thickness together; branches follow the trunk.",
   "treefactory.canopy.ellipsoid": "Ellipsoid",
   "treefactory.canopy.sphere": "Sphere",
   "treefactory.canopy.umbrella": "Umbrella",

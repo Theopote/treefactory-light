@@ -6,14 +6,14 @@ import java.util.Objects;
 public record TreeConfig(TreePreset preset, TreeScale scale, long seed,
                          double crookedness, double spread, double fullness,
                          CanopyShape canopyShape, double canopyScale, double attractionDensity,
-                         double pipeExponent, BlockPalette blockPalette, double height) {
-    public static final double MIN_HEIGHT=6, MAX_HEIGHT=48;
+                         double pipeExponent, BlockPalette blockPalette, double height, double trunkThickness) {
+    public static final double MIN_HEIGHT=6, MAX_HEIGHT=48, MIN_THICKNESS=.5, MAX_THICKNESS=2.0;
     public TreeConfig {
         Objects.requireNonNull(preset);
         Objects.requireNonNull(scale);
         unit(crookedness); unit(spread); unit(fullness);
         Objects.requireNonNull(canopyShape); Objects.requireNonNull(blockPalette);
-        range(height,MIN_HEIGHT,MAX_HEIGHT); range(canopyScale,.75,2.0); range(attractionDensity,.5,2.0); range(pipeExponent,2.5,3.0);
+        range(height,MIN_HEIGHT,MAX_HEIGHT); range(canopyScale,.75,2.0); range(attractionDensity,.5,2.0); range(pipeExponent,2.5,3.0); range(trunkThickness,MIN_THICKNESS,MAX_THICKNESS);
     }
     private static void unit(double value) {
         if (!Double.isFinite(value) || value < 0 || value > 1)
@@ -21,6 +21,12 @@ public record TreeConfig(TreePreset preset, TreeScale scale, long seed,
     }
     private static void range(double value,double min,double max) {
         if (!Double.isFinite(value) || value<min || value>max) throw new IllegalArgumentException("Value outside allowed range");
+    }
+    public TreeConfig(TreePreset preset, TreeScale scale, long seed,
+                      double crookedness, double spread, double fullness,
+                      CanopyShape canopyShape, double canopyScale, double attractionDensity,
+                      double pipeExponent, BlockPalette blockPalette, double height) {
+        this(preset,scale,seed,crookedness,spread,fullness,canopyShape,canopyScale,attractionDensity,pipeExponent,blockPalette,height,1.0);
     }
     /** Tree height defaults to the height of the given size tier. */
     public TreeConfig(TreePreset preset, TreeScale scale, long seed,
@@ -40,13 +46,13 @@ public record TreeConfig(TreePreset preset, TreeScale scale, long seed,
                 .35, .6, .8, "minecraft:oak_log", "minecraft:oak_leaves");
     }
     public TreeConfig withDna(double crooked, double spread, double full) {
-        return new TreeConfig(preset, scale, seed, crooked, spread, full, canopyShape,canopyScale,attractionDensity,pipeExponent,blockPalette,height);
+        return new TreeConfig(preset, scale, seed, crooked, spread, full, canopyShape,canopyScale,attractionDensity,pipeExponent,blockPalette,height,trunkThickness);
     }
     public TreeConfig withScale(TreeScale size) {
-        return new TreeConfig(preset, size, seed, crookedness, spread, fullness, canopyShape,canopyScale,attractionDensity,pipeExponent,blockPalette,size.height);
+        return new TreeConfig(preset, size, seed, crookedness, spread, fullness, canopyShape,canopyScale,attractionDensity,pipeExponent,blockPalette,size.height,trunkThickness);
     }
     public TreeConfig withHeight(double blocks) {
-        return new TreeConfig(preset, nearestScale(blocks), seed, crookedness, spread, fullness, canopyShape,canopyScale,attractionDensity,pipeExponent,blockPalette,blocks);
+        return new TreeConfig(preset, nearestScale(blocks), seed, crookedness, spread, fullness, canopyShape,canopyScale,attractionDensity,pipeExponent,blockPalette,blocks,trunkThickness);
     }
     private static TreeScale nearestScale(double blocks) {
         TreeScale best=TreeScale.MEDIUM;
@@ -54,11 +60,11 @@ public record TreeConfig(TreePreset preset, TreeScale scale, long seed,
         return best;
     }
     public TreeConfig withSeed(long value) {
-        return new TreeConfig(preset, scale, value, crookedness, spread, fullness, canopyShape,canopyScale,attractionDensity,pipeExponent,blockPalette,height);
+        return new TreeConfig(preset, scale, value, crookedness, spread, fullness, canopyShape,canopyScale,attractionDensity,pipeExponent,blockPalette,height,trunkThickness);
     }
     public TreeConfig withPreset(TreePreset type) {
         String wood = type == TreePreset.PINE ? "spruce" : "oak";
-        return new TreeConfig(type,scale,seed,crookedness,spread,fullness,CanopyShape.forPreset(type),canopyScale,attractionDensity,pipeExponent,BlockPalette.defaults(wood),height);
+        return new TreeConfig(type,scale,seed,crookedness,spread,fullness,CanopyShape.forPreset(type),canopyScale,attractionDensity,pipeExponent,BlockPalette.defaults(wood),height,trunkThickness);
     }
     public TreeConfig withPalette(String log, String leaves) {
         return withBlockPalette(blockPalette.withMainAndPrimary(log,leaves));
@@ -66,12 +72,15 @@ public record TreeConfig(TreePreset preset, TreeScale scale, long seed,
     public String logBlock() { return blockPalette.mainTrunk(); }
     public String leavesBlock() { return blockPalette.primaryLeaf(); }
     public TreeConfig withCanopy(CanopyShape shape,double scale,double density) {
-        return new TreeConfig(preset,this.scale,seed,crookedness,spread,fullness,shape,scale,density,pipeExponent,blockPalette,height);
+        return new TreeConfig(preset,this.scale,seed,crookedness,spread,fullness,shape,scale,density,pipeExponent,blockPalette,height,trunkThickness);
     }
     public TreeConfig withPipeExponent(double exponent) {
-        return new TreeConfig(preset,scale,seed,crookedness,spread,fullness,canopyShape,canopyScale,attractionDensity,exponent,blockPalette,height);
+        return new TreeConfig(preset,scale,seed,crookedness,spread,fullness,canopyShape,canopyScale,attractionDensity,exponent,blockPalette,height,trunkThickness);
+    }
+    public TreeConfig withTrunkThickness(double value) {
+        return new TreeConfig(preset,scale,seed,crookedness,spread,fullness,canopyShape,canopyScale,attractionDensity,pipeExponent,blockPalette,height,value);
     }
     public TreeConfig withBlockPalette(BlockPalette palette) {
-        return new TreeConfig(preset,scale,seed,crookedness,spread,fullness,canopyShape,canopyScale,attractionDensity,pipeExponent,palette,height);
+        return new TreeConfig(preset,scale,seed,crookedness,spread,fullness,canopyShape,canopyScale,attractionDensity,pipeExponent,palette,height,trunkThickness);
     }
 }

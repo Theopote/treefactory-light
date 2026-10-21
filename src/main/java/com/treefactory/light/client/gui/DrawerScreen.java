@@ -96,7 +96,9 @@ public final class DrawerScreen extends Screen {
             addContent(new DNAControlSlider(M,y-scroll,w,"treefactory.attraction_density",(c.attractionDensity()-.5)/1.5,
                     v->{TreeConfig now=state.config();state.update(now.withCanopy(now.canopyShape(),now.canopyScale(),.5+1.5*v));})); y+=22;
             addContent(new DNAControlSlider(M,y-scroll,w,"treefactory.pipe_exponent",(c.pipeExponent()-2.5)/.5,
-                    v->state.update(state.config().withPipeExponent(2.5+.5*v)))); y+=24;
+                    v->state.update(state.config().withPipeExponent(2.5+.5*v)))); y+=22;
+            addContent(new DNAControlSlider(M,y-scroll,w,"treefactory.trunk_thickness",(c.trunkThickness()-.5)/1.5,
+                    v->state.update(state.config().withTrunkThickness(.5+1.5*v)))); y+=24;
             Button materials=button(M,y-scroll,w,"treefactory.choose_materials",()->{ materialsOpen=!materialsOpen; expanded=Panel.NONE; refresh(); });
             materials.setMessage(Component.translatable("treefactory.choose_materials").append(materialsOpen?" ▶":" ▼"));
             addContent(materials); y+=24;
