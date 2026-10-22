@@ -14,12 +14,46 @@ public final class Voxelizer {
         public boolean woody() { return ordinal()<=THIN_BRANCH.ordinal(); }
     }
     public static final int MAX_BLOCKS = 80000;
+
+    /** Tracks voxel count and enforces {@link #MAX_BLOCKS} on every new cell. */
+    static final class VoxelAccumulator {
+        private final Map<Cell, Material> blocks = new LinkedHashMap<>();
+        private final Map<Cell, Axis> axes = new HashMap<>();
+
+        Map<Cell, Material> blocks() { return blocks; }
+        Map<Cell, Axis> axes() { return axes; }
+        int size() { return blocks.size(); }
+
+        void putWood(Cell cell, Material wood, Axis axis) {
+            Material old = blocks.get(cell);
+            if (old == null) {
+                ensureBudget();
+                blocks.put(cell, wood);
+                axes.put(cell, axis);
+                return;
+            }
+            if (!old.woody() || wood.ordinal() < old.ordinal()) {
+                blocks.put(cell, wood);
+                axes.put(cell, axis);
+            }
+        }
+
+        void putLeaf(Cell cell, Material leaf) {
+            if (blocks.containsKey(cell)) return;
+            ensureBudget();
+            blocks.put(cell, leaf);
+        }
+
+        private void ensureBudget() {
+            if (blocks.size() >= MAX_BLOCKS) throw new IllegalArgumentException("Tree exceeds block budget");
+        }
+    }
+
     public Map<Cell, Material> voxelize(List<TreeNode> nodes, TreeConfig config, BooleanSupplier cancelled) {
         return voxelizeData(nodes,config,cancelled).blocks();
     }
     public VoxelData voxelizeData(List<TreeNode> nodes, TreeConfig config, BooleanSupplier cancelled) {
-        Map<Cell, Material> blocks = new LinkedHashMap<>();
-        Map<Cell,Axis> axes=new HashMap<>();
+        VoxelAccumulator acc = new VoxelAccumulator();
         boolean[] parents = new boolean[nodes.size()];
         for (TreeNode node : nodes) {
             check(cancelled);
@@ -29,10 +63,8 @@ public final class Voxelizer {
             double radius=Math.max(parent.radius(),node.radius());
             if (config.preset()==TreePreset.WILLOW && config.fullness()>0
                     && isDroopDrop(node,parent) && droopDepth(nodes,node)>=2) {
-                // Only the first step off the crown is bark; the rest of the hanging strand reads as
-                // leaves rather than a bare log curtain.
                 double leafRadius=Math.max(radius,.9);
-                fill(blocks,axes,parent.position(),node.position(),leafRadius,leafRadius,
+                fill(acc,parent.position(),node.position(),leafRadius,leafRadius,
                         Material.PRIMARY_LEAF,Axis.Y,cancelled,config.seed(),config.blockPalette());
                 continue;
             }
@@ -41,8 +73,8 @@ public final class Voxelizer {
             Material wood=parent.position().y()<config.height()*.36+1 && lateral<=cap+.8
                     ? Material.MAIN_TRUNK : radius>=.7 ? Material.THICK_BRANCH : Material.THIN_BRANCH;
             Axis axis=axis(parent.position(),node.position());
-            fill(blocks,axes,parent.position(),node.position(),parent.radius(),node.radius(),wood,axis,cancelled,config.seed(),config.blockPalette());
-            connectSpine(blocks,axes,parent.position(),node.position(),wood,axis);
+            fill(acc,parent.position(),node.position(),parent.radius(),node.radius(),wood,axis,cancelled,config.seed(),config.blockPalette());
+            connectSpine(acc,parent.position(),node.position(),wood,axis);
         }
         if (config.preset() != TreePreset.DEAD && config.fullness()>0) {
             double radius = 1.2+config.fullness()*1.8;
@@ -52,10 +84,10 @@ public final class Voxelizer {
                 if (config.preset()==TreePreset.WILLOW && nodes.get(i).parent()>=0
                         && p.y()<nodes.get(nodes.get(i).parent()).position().y())
                     leafRadius*=.45;
-                fill(blocks,axes,p,p,leafRadius,leafRadius,Material.PRIMARY_LEAF,Axis.Y,cancelled,config.seed(),config.blockPalette());
+                fill(acc,p,p,leafRadius,leafRadius,Material.PRIMARY_LEAF,Axis.Y,cancelled,config.seed(),config.blockPalette());
             }
         }
-        return new VoxelData(Collections.unmodifiableMap(blocks),Collections.unmodifiableMap(axes));
+        return new VoxelData(Collections.unmodifiableMap(acc.blocks()),Collections.unmodifiableMap(acc.axes()));
     }
     /** True for the straight-down, same-column edges the willow tail-growth appends below each crown tip. */
     private static boolean isDroopDrop(TreeNode node, TreeNode parent) {
@@ -96,7 +128,7 @@ public final class Voxelizer {
         double radius = length2 < 1e-12 ? Math.max(r1,r2) : r1+(r2-r1)*t;
         return point.subtract(a.add(axis.multiply(t))).lengthSquared() <= radius*radius + 1e-10;
     }
-    private void fill(Map<Cell,Material> result,Map<Cell,Axis> axes, Vector3 a, Vector3 b, double r1, double r2,
+    private void fill(VoxelAccumulator acc, Vector3 a, Vector3 b, double r1, double r2,
                       Material material,Axis axis, BooleanSupplier cancelled,long seed,BlockPalette palette) {
         double r = Math.max(r1,r2);
         for (int x=(int)Math.floor(Math.min(a.x(),b.x())-r); x<=Math.ceil(Math.max(a.x(),b.x())+r); x++) {
@@ -108,10 +140,8 @@ public final class Voxelizer {
                     if (!material.woody()) {
                         double dx=x+.5-a.x(),dy=y+.5-a.y(),dz=z+.5-a.z();
                         if (Math.sqrt(dx*dx+dy*dy+dz*dz) > r*(.78+.3*cellHash(x,y,z,seed^0x5bd1e995L))) continue;
-                    }
-                    if (material.woody()) putWood(result,axes,cell,material,axis);
-                    else result.putIfAbsent(cell,leafMaterial(cell,seed,palette));
-                    if (result.size()>MAX_BLOCKS) throw new IllegalArgumentException("Tree exceeds block budget");
+                        acc.putLeaf(cell, leafMaterial(cell,seed,palette));
+                    } else acc.putWood(cell, material, axis);
                 }
         }
     }
@@ -127,24 +157,20 @@ public final class Voxelizer {
         if(sample<palette.primaryWeight()+palette.secondaryWeight()) return Material.SECONDARY_LEAF;
         return Material.ACCENT;
     }
-    private static void putWood(Map<Cell,Material> blocks,Map<Cell,Axis> axes,Cell cell,Material wood,Axis axis) {
-        Material old=blocks.get(cell);
-        if(old==null || !old.woody() || wood.ordinal()<old.ordinal()) {
-            blocks.put(cell,wood); axes.put(cell,axis);
-        }
+    static void connectSpineForTest(VoxelAccumulator acc,Vector3 a,Vector3 b,Material wood,Axis axis) {
+        connectSpine(acc,a,b,wood,axis);
     }
-    private static void connectSpine(Map<Cell,Material> blocks,Map<Cell,Axis> axes,Vector3 a,Vector3 b,Material wood,Axis axis) {
+    private static void connectSpine(VoxelAccumulator acc,Vector3 a,Vector3 b,Material wood,Axis axis) {
         int x=(int)Math.floor(a.x()),y=(int)Math.floor(a.y()),z=(int)Math.floor(a.z());
-        putWood(blocks,axes,new Cell(x,y,z),wood,axis);
+        acc.putWood(new Cell(x,y,z),wood,axis);
         Vector3 delta=b.subtract(a);
         int steps=Math.max(1,(int)Math.ceil(Math.sqrt(delta.lengthSquared())*4));
         for(int i=1;i<=steps;i++) {
             Vector3 p=a.add(delta.multiply(i/(double)steps));
             int tx=(int)Math.floor(p.x()),ty=(int)Math.floor(p.y()),tz=(int)Math.floor(p.z());
-            while(x!=tx) { x+=Integer.signum(tx-x); putWood(blocks,axes,new Cell(x,y,z),wood,axis); }
-            while(y!=ty) { y+=Integer.signum(ty-y); putWood(blocks,axes,new Cell(x,y,z),wood,axis); }
-            while(z!=tz) { z+=Integer.signum(tz-z); putWood(blocks,axes,new Cell(x,y,z),wood,axis); }
-            if(blocks.size()>MAX_BLOCKS) throw new IllegalArgumentException("Tree exceeds block budget");
+            while(x!=tx) { x+=Integer.signum(tx-x); acc.putWood(new Cell(x,y,z),wood,axis); }
+            while(y!=ty) { y+=Integer.signum(ty-y); acc.putWood(new Cell(x,y,z),wood,axis); }
+            while(z!=tz) { z+=Integer.signum(tz-z); acc.putWood(new Cell(x,y,z),wood,axis); }
         }
     }
 }

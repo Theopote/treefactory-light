@@ -82,6 +82,36 @@ public enum CanopyShape implements ICanopyShape {
     /** Vertical stretch applies to every shape except the sphere. */
     public boolean stretchable() { return this!=SPHERE; }
     public boolean layered() { return this==SPINDLE_MULTI_LAYER; }
+    /**
+     * Normalized minimum y of the crown along x=z=0. Used to anchor the crown base when stretching.
+     * Values are conservative (at or below the true boundary) for axisymmetric shapes.
+     */
+    public double minY(int layers) {
+        return switch (this) {
+            case HEMISPHERE -> 0;
+            case SPINDLE_MULTI_LAYER -> layeredMinY(layers);
+            case UMBRELLA -> -.55;
+            default -> -1;
+        };
+    }
+    /** Normalized maximum y of the crown along x=z=0. */
+    public double maxY(int layers) {
+        return switch (this) {
+            case HEMISPHERE -> 1;
+            case SPINDLE_MULTI_LAYER -> layeredMaxY(layers);
+            default -> 1;
+        };
+    }
+    private static double layeredMinY(int layers) {
+        int n=Math.max(2,layers);
+        double spacing=1.16/(n-1), thickness=.4*spacing;
+        return -.58-thickness;
+    }
+    private static double layeredMaxY(int layers) {
+        int n=Math.max(2,layers);
+        double spacing=1.16/(n-1), thickness=.4*spacing;
+        return -.58+(n-1)*spacing+thickness;
+    }
     private static double layeredField(double x,double y,double z,int layers) {
         int n=Math.max(2,layers);
         double spacing=1.16/(n-1), thickness=.4*spacing, best=Double.POSITIVE_INFINITY;

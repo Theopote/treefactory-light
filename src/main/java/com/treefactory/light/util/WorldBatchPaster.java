@@ -2,8 +2,12 @@ package com.treefactory.light.util;
 
 import com.treefactory.light.TreefactoryLight;
 import com.treefactory.light.core.tree.PlacementHistory;
+import com.treefactory.light.core.tree.PreviewRevision;
+import com.treefactory.light.core.tree.TreePlacementValidator;
+import com.treefactory.light.core.tree.UndoPlanner;
 import com.treefactory.light.core.algorithm.Voxelizer;
 import com.treefactory.light.core.config.TreeConfig;
+import com.treefactory.light.core.tree.Cell;
 import net.minecraft.core.*;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -50,10 +54,11 @@ public final class WorldBatchPaster {
         boolean closing;
         Session(ServerLevel level) { this.level=level; }
     }
-    private record Request(BlockPos origin, TreeConfig config) {}
+    private record Request(BlockPos origin, TreeConfig config, long revision) {}
+    private record DiskSnapshot(List<PreviewSnapshot> previews, Map<UUID,List<CommittedTree>> undo, Path target) {}
     private final Map<UUID,AtomicBoolean> pending = new HashMap<>();
     private final Map<UUID,Session> sessions = new HashMap<>();
-    private final Set<UUID> commitWhenDone = new HashSet<>();
+    private final PreviewRevision revisions = new PreviewRevision();
     private final Map<UUID,Request> queued = new HashMap<>();
     private final Map<UUID,Long> lastPreview = new HashMap<>();
     private final Map<UUID,ArrayDeque<CommittedTree>> undo = new HashMap<>();
@@ -61,6 +66,7 @@ public final class WorldBatchPaster {
     private final ExecutorService persistExecutor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "treefactory-light-persist"); t.setDaemon(true); return t;
     });
+    private final CoalescedPersistQueue persistQueue = new CoalescedPersistQueue();
     private MinecraftServer server;
     private boolean dirty;
     private long lastPersistNs;
@@ -89,7 +95,8 @@ public final class WorldBatchPaster {
     public void preview(ServerPlayer player, BlockPos origin, TreeConfig config) {
         if (!authorized(player)) return;
         UUID id = player.getUUID();
-        queued.put(id, new Request(origin, config));
+        long revision = revisions.next(id);
+        queued.put(id, new Request(origin, config, revision));
         startQueued();
     }
     private void startQueued() {
@@ -100,72 +107,108 @@ public final class WorldBatchPaster {
             Long last=lastPreview.get(id);
             // A request pending commit must not be stuck behind the throttle: the player
             // already closed the UI and nothing else will ever flush it.
-            if (!commitWhenDone.contains(id) && last!=null && System.nanoTime()-last<THROTTLE_NS) continue;
+            if (revisions.commitTarget(id)==null && last!=null && System.nanoTime()-last<THROTTLE_NS) continue;
             Request request=queued.remove(id);
             if (request==null) continue;
             ServerPlayer player=server.getPlayerList().getPlayer(id);
-            if (player==null || !authorized(player)) { commitWhenDone.remove(id); continue; }
-            beginPreview(player, request.origin(), request.config());
+            if (player==null || !authorized(player)) { revisions.clearCommitTarget(id); continue; }
+            beginPreview(player, request);
         }
     }
-    private void beginPreview(ServerPlayer player, BlockPos origin, TreeConfig config) {
+    private void beginPreview(ServerPlayer player, Request request) {
         UUID id = player.getUUID();
+        BlockPos origin = request.origin();
+        TreeConfig config = request.config();
+        long revision = request.revision();
         ServerLevel level = player.level();
         if(player.distanceToSqr(origin.getX()+.5,origin.getY()+.5,origin.getZ()+.5)>PLACE_RANGE*PLACE_RANGE) {
-            rejectPreview(player,"treefactory.target_too_far"); return;
+            rejectPreview(player, revision, "treefactory.target_too_far"); return;
         }
         String originProblem=inaccessibleReason(level,origin);
-        if(originProblem!=null) { rejectPreview(player,originProblem); return; }
-        if(!level.mayInteract(player,origin)) { rejectPreview(player,"treefactory.target_protected"); return; }
+        if(originProblem!=null) { rejectPreview(player, revision, originProblem); return; }
+        if(!level.mayInteract(player,origin)) { rejectPreview(player, revision, "treefactory.target_protected"); return; }
         final EnumMap<Voxelizer.Material,BlockState> materials;
         try { materials=palette(config); }
-        catch (IllegalArgumentException e) { rejectPreview(player,"treefactory.invalid_palette"); return; }
+        catch (IllegalArgumentException e) { rejectPreview(player, revision, "treefactory.invalid_palette"); return; }
         AtomicBoolean cancel = new AtomicBoolean();
         pending.put(id,cancel);
         lastPreview.put(id, System.nanoTime());
         var running = level.getServer();
         CompletableFuture.supplyAsync(() -> {
             var result = new com.treefactory.light.core.tree.TreeBuildTask().build(config,cancel::get);
-            Map<BlockPos,BlockState> blocks = new LinkedHashMap<>();
-            result.blocks().forEach((p,m) -> blocks.put(origin.offset(p.x(),p.y(),p.z()),
-                    orient(materials.get(m),result.axes().get(p))));
-            return blocks;
-        },ForkJoinPool.commonPool()).whenComplete((blocks,error) -> {
+            return result;
+        },ForkJoinPool.commonPool()).whenComplete((result,error) -> {
             if (cancel.get()) return;
             running.execute(() -> {
                 if (pending.get(id)!=cancel) return;
                 pending.remove(id);
                 ServerPlayer current = running.getPlayerList().getPlayer(id);
                 if (current==null || current.level()!=level || !authorized(current)) { discard(id); startQueued(); return; }
-                if (error!=null) { TreefactoryLight.LOGGER.warn("Tree generation failed",error); message(current,"treefactory.failed"); }
-                else apply(current,level,blocks);
-                // Let any newer request for this player (queued while this one was building) take over
-                // before committing, so a commit always applies to the latest preview, never a stale one.
-                startQueued();
-                // On error the flag must still be consumed; commit whatever preview already exists.
-                if (commitWhenDone.contains(id) && !pending.containsKey(id) && !queued.containsKey(id)) {
-                    commitWhenDone.remove(id);
-                    commit(current);
+                if (revisions.isStale(revision, id)) { startQueued(); tryFinishCommit(current); return; }
+                boolean applied=false;
+                if (error!=null) {
+                    TreefactoryLight.LOGGER.warn("Tree generation failed",error);
+                    message(current,"treefactory.failed");
+                } else {
+                    var validation=validatePlacement(current, level, origin, result.blocks(), sessions.get(id));
+                    if (!validation.ok()) message(current, validation.messageKey());
+                    else {
+                        Map<BlockPos,BlockState> blocks = new LinkedHashMap<>();
+                        validation.placeable().forEach((cell, material) -> blocks.put(origin.offset(cell.x(),cell.y(),cell.z()),
+                                orient(materials.get(material), result.axes().get(cell))));
+                        apply(current, level, blocks);
+                        revisions.markApplied(id, revision);
+                        applied=true;
+                    }
                 }
+                startQueued();
+                tryFinishCommit(current, applied);
             });
         });
     }
-    /** A queued request that never reaches {@link #apply} (validation failure) must not strand a
-     * pending commit flag: fall back to committing whatever preview already exists, if any. */
-    private void rejectPreview(ServerPlayer player, String key) {
-        message(player,key);
-        if (commitWhenDone.remove(player.getUUID())) commit(player);
+    /** Validation failed or generation superseded: never commit a stale preview. */
+    private void rejectPreview(ServerPlayer player, long revision, String key) {
+        message(player, key);
+        if (Objects.equals(revisions.commitTarget(player.getUUID()), revision)) {
+            revisions.clearCommitTarget(player.getUUID());
+            message(player, "treefactory.commit_failed");
+        }
+    }
+    private void tryFinishCommit(ServerPlayer player) { tryFinishCommit(player, true); }
+    private void tryFinishCommit(ServerPlayer player, boolean latestApplied) {
+        UUID id=player.getUUID();
+        if (pending.containsKey(id) || queued.containsKey(id)) return;
+        if (!revisions.shouldCommit(id)) {
+            if (revisions.commitTarget(id)!=null && !latestApplied) {
+                revisions.clearCommitTarget(id);
+                message(player, "treefactory.commit_failed");
+            }
+            return;
+        }
+        revisions.clearCommitTarget(id);
+        commit(player);
     }
     /** Keeps the current preview tree permanently (after any in-flight rebuild finishes). */
     public void commit(ServerPlayer player) {
         UUID id=player.getUUID();
-        if (pending.containsKey(id) || queued.containsKey(id)) { commitWhenDone.add(id); startQueued(); return; }
+        if (pending.containsKey(id) || queued.containsKey(id)) {
+            revisions.requestCommit(id, revisions.latest(id));
+            startQueued();
+            return;
+        }
+        if (revisions.commitTarget(id)!=null && !revisions.shouldCommit(id)) {
+            revisions.clearCommitTarget(id);
+            message(player, "treefactory.commit_failed");
+            return;
+        }
+        revisions.clearCommitTarget(id);
         Session session=sessions.remove(id);
         if (session==null) return;
         ArrayDeque<CommittedTree> stack=undo.computeIfAbsent(id, k -> new ArrayDeque<>());
         stack.addLast(new CommittedTree(session.level.dimension().identifier().toString(),
                 Map.copyOf(session.placed), Map.copyOf(session.original)));
         while (stack.size()>PlacementHistory.LIMIT) stack.removeFirst();
+        revisions.clear(id);
         persist(true);
         player.sendSystemMessage(Component.translatable("treefactory.built",session.placed.size()),false);
     }
@@ -174,16 +217,23 @@ public final class WorldBatchPaster {
         UUID id=player.getUUID();
         ArrayDeque<CommittedTree> stack=undo.get(id);
         if (stack==null || stack.isEmpty()) { message(player,"treefactory.nothing_to_undo"); return; }
-        CommittedTree tree=stack.removeLast();
+        CommittedTree tree=stack.peekLast();
         ServerLevel level=level(tree.dimension());
-        if (level==null) { message(player,"treefactory.nothing_to_undo"); return; }
-        var entry=new PlacementHistory.Entry<>(tree.placed(), tree.original());
-        Map<BlockPos,BlockState> restore=entry.restorations(pos -> chunkReady(level, pos)?level.getBlockState(pos):null);
+        if (level==null) { message(player,"treefactory.undo_dimension"); return; }
+        Map<BlockPos,BlockState> restore=UndoPlanner.planRestorations(tree.placed(), tree.original(),
+                pos -> chunkReady(level, pos) ? level.getBlockState(pos) : null,
+                pos -> chunkReady(level, pos));
+        if (restore==null) { message(player,"treefactory.undo_unloaded"); return; }
+        if (restore.isEmpty()) {
+            stack.removeLast();
+            persist(true);
+            message(player,"treefactory.undo_nothing_left");
+            return;
+        }
+        stack.removeLast();
         int count=0;
         for (var cell : restore.entrySet()) {
-            BlockPos pos=cell.getKey();
-            if (!level.getBlockState(pos).equals(tree.placed().get(pos))) continue;
-            level.setBlock(pos, cell.getValue(), FLAGS);
+            level.setBlock(cell.getKey(), cell.getValue(), FLAGS);
             count++;
         }
         persist(true);
@@ -192,7 +242,8 @@ public final class WorldBatchPaster {
     /** Removes the preview tree and restores the world. */
     public void discard(UUID id) {
         AtomicBoolean flag=pending.remove(id); if(flag!=null) flag.set(true);
-        commitWhenDone.remove(id); queued.remove(id);
+        revisions.clearCommitTarget(id);
+        queued.remove(id);
         Session session=sessions.get(id);
         if (session==null) return;
         session.closing=true;
@@ -212,7 +263,7 @@ public final class WorldBatchPaster {
         persist(true);
     }
     public void stop() {
-        pending.values().forEach(f -> f.set(true)); pending.clear(); commitWhenDone.clear(); queued.clear();
+        pending.values().forEach(f -> f.set(true)); pending.clear(); revisions.clearCommitTargets(); queued.clear();
         for (UUID id : new ArrayList<>(sessions.keySet())) {
             Session session=sessions.get(id);
             if (session==null) continue;
@@ -243,6 +294,17 @@ public final class WorldBatchPaster {
         changed|=sessions.entrySet().removeIf(e -> e.getValue().closing && e.getValue().placed.isEmpty());
         if (changed) dirty=true;
     }
+    static TreePlacementValidator.Result validatePlacement(ServerPlayer player, ServerLevel level, BlockPos origin,
+            Map<Cell,Voxelizer.Material> blocks, Session session) {
+        return TreePlacementValidator.validate(blocks,
+                cell -> inaccessibleReason(level, origin.offset(cell.x(), cell.y(), cell.z())),
+                cell -> level.mayInteract(player, origin.offset(cell.x(), cell.y(), cell.z())),
+                cell -> {
+                    BlockPos pos = origin.offset(cell.x(), cell.y(), cell.z());
+                    if (session != null && session.placed.containsKey(pos)) return true;
+                    return replaceable(level.getBlockState(pos));
+                });
+    }
     private void apply(ServerPlayer player,ServerLevel level,Map<BlockPos,BlockState> blocks) {
         UUID id=player.getUUID();
         Session session=sessions.get(id);
@@ -256,13 +318,7 @@ public final class WorldBatchPaster {
                 session.original.remove(entry.getKey()); tracked.remove();
             }
         }
-        Map<BlockPos,BlockState> next=new HashMap<>();
-        for (var entry:blocks.entrySet()) {
-            BlockPos pos=entry.getKey();
-            if (inaccessibleReason(level,pos)!=null || !level.mayInteract(player,pos)) continue;
-            if (!session.original.containsKey(pos) && !replaceable(level.getBlockState(pos))) continue;
-            next.put(pos,entry.getValue());
-        }
+        Map<BlockPos,BlockState> next=new HashMap<>(blocks);
         for (BlockPos pos:new ArrayList<>(session.placed.keySet())) if (!next.containsKey(pos)) restore(session,pos);
         for (var entry:next.entrySet()) {
             BlockPos pos=entry.getKey();
@@ -290,7 +346,7 @@ public final class WorldBatchPaster {
         return null;
     }
     /** Same check as deprecated {@code hasChunkAt}, without loading or generating chunks. */
-    private static boolean chunkReady(ServerLevel level, BlockPos pos) {
+    static boolean chunkReady(ServerLevel level, BlockPos pos) {
         return level.getChunk(SectionPos.blockToSectionCoord(pos.getX()), SectionPos.blockToSectionCoord(pos.getZ()),
                 ChunkStatus.FULL, false) != null;
     }
@@ -315,20 +371,25 @@ public final class WorldBatchPaster {
      */
     private Future<?> persist(boolean immediate) {
         if (server==null) return null;
-        dirty=false;
         if (!immediate) {
             long now=System.nanoTime();
             if (now-lastPersistNs<PERSIST_THROTTLE_NS) { dirty=true; return null; }
         }
+        dirty=false;
         lastPersistNs=System.nanoTime();
+        return persistQueue.enqueue(this::captureDiskSnapshot, snapshot -> {
+            DiskSnapshot disk=(DiskSnapshot)snapshot;
+            writeToDisk(disk.previews(), disk.undo(), disk.target());
+        }, persistExecutor);
+    }
+    private DiskSnapshot captureDiskSnapshot() {
         List<PreviewSnapshot> previews=new ArrayList<>();
         sessions.forEach((id,session) -> previews.add(new PreviewSnapshot(id,
                 session.level.dimension().identifier().toString(), session.closing,
                 Map.copyOf(session.placed), Map.copyOf(session.original))));
         Map<UUID,List<CommittedTree>> undoSnapshot=new LinkedHashMap<>();
         undo.forEach((id,stack) -> undoSnapshot.put(id, List.copyOf(stack)));
-        Path target=dataFile();
-        return persistExecutor.submit(() -> writeToDisk(previews, undoSnapshot, target));
+        return new DiskSnapshot(previews, undoSnapshot, dataFile());
     }
     private static void writeToDisk(List<PreviewSnapshot> previews, Map<UUID,List<CommittedTree>> undoSnapshot, Path target) {
         CompoundTag root=new CompoundTag();
