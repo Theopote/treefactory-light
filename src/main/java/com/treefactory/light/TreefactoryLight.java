@@ -38,6 +38,9 @@ public class TreefactoryLight implements ModInitializer {
 		PayloadTypeRegistry.serverboundPlay().register(C2SPreviewTreePacket.TYPE,C2SPreviewTreePacket.CODEC);
 		PayloadTypeRegistry.serverboundPlay().register(C2SFinishTreePacket.TYPE,C2SFinishTreePacket.CODEC);
 		PayloadTypeRegistry.serverboundPlay().register(C2SUndoTreePacket.TYPE,C2SUndoTreePacket.CODEC);
+		PayloadTypeRegistry.clientboundPlay().register(S2CTreeCommitResultPacket.TYPE,S2CTreeCommitResultPacket.CODEC);
+		PASTER.setCommitNotifier((player, success) ->
+				ServerPlayNetworking.send(player, new S2CTreeCommitResultPacket(success)));
 		ServerPlayNetworking.registerGlobalReceiver(C2SPreviewTreePacket.TYPE,(packet,context) ->
 				context.server().execute(() -> PASTER.preview(context.player(),packet.origin(),packet.config())));
 		ServerPlayNetworking.registerGlobalReceiver(C2SFinishTreePacket.TYPE,(packet,context) ->

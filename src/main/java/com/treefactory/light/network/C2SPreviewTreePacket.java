@@ -6,6 +6,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
+import org.jspecify.annotations.NonNull;
 
 public record C2SPreviewTreePacket(BlockPos origin, TreeConfig config) implements CustomPacketPayload {
     public static final Type<C2SPreviewTreePacket> TYPE = new Type<>(TreefactoryLight.id("preview_tree"));
@@ -38,5 +39,5 @@ public record C2SPreviewTreePacket(BlockPos origin, TreeConfig config) implement
         E[] values = type.getEnumConstants();
         return b.readById(id -> values[id]);
     }
-    @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
+    @Override public @NonNull Type<? extends CustomPacketPayload> type() { return TYPE; }
 }

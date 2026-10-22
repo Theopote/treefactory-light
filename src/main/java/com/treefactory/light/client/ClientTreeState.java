@@ -33,10 +33,15 @@ public final class ClientTreeState {
     private static final List<PresetStore.Preset> BUILT_IN_PRESETS=BuiltInPresets.all();
     private List<PresetStore.Preset> presets=BUILT_IN_PRESETS;
     private String status="";
+    public enum FinishPhase { NONE, PREPARING, FINISHING }
+    private FinishPhase finishPhase=FinishPhase.NONE;
+    private Runnable finishCallback;
     public TreeConfig config() { return config; }
     public PreviewSnapshot preview() { return preview!=null && preview.config().equals(config)?preview:null; }
     public List<PresetStore.Preset> presets() { return presets; }
     public String status() { return status; }
+    public FinishPhase finishPhase() { return finishPhase; }
+    public boolean isGenerating() { return generating; }
     public boolean update(TreeConfig next) {
         if(config.equals(next)) return true;
         // Imported presets may reference missing blocks or blocks outside the allowed palette.
@@ -90,6 +95,7 @@ public final class ClientTreeState {
         if(active && mc.level!=null && !(mc.gui.screen() instanceof DrawerScreen)) cancel();
         if(mc.level==null || (!holdingWand() && !(mc.gui.screen() instanceof DrawerScreen))) return;
         if(placeDirty && target!=null && System.nanoTime()-placeChangedAt>=80_000_000L) sendPreview();
+        if(finishPhase==FinishPhase.PREPARING && !generating && !dirty && !placeDirty) sendFinishRequest();
         if(!dirty || generating || System.nanoTime()-changedAt<50_000_000L) return;
         generating=true; dirty=false;
         long token=revision.get(); TreeConfig snapshot=config; status=Component.translatable("treefactory.generating").getString();
@@ -107,12 +113,34 @@ public final class ClientTreeState {
         if(!ClientPlayNetworking.canSend(C2SPreviewTreePacket.TYPE)) { toast("treefactory.no_server"); return; }
         ClientPlayNetworking.send(new C2SPreviewTreePacket(target,config));
     }
-    /** Makes the previewed tree permanent. Returns false when nothing has been placed yet. */
-    public boolean finish() {
-        if(!active || target==null) { toast("treefactory.aim_first"); return false; }
-        if(placeDirty) sendPreview();
-        if(ClientPlayNetworking.canSend(C2SFinishTreePacket.TYPE)) ClientPlayNetworking.send(new C2SFinishTreePacket(true));
-        active=false; target=null; return true;
+    /** Requests permanent placement; {@code onSuccess} runs only after the server confirms. */
+    public void requestFinish(Runnable onSuccess) {
+        if(finishPhase!=FinishPhase.NONE) return;
+        if(!active || target==null) { toast("treefactory.aim_first"); return; }
+        if(!ClientPlayNetworking.canSend(C2SFinishTreePacket.TYPE)) { toast("treefactory.no_server"); return; }
+        finishCallback=onSuccess;
+        if(generating || dirty || placeDirty) {
+            finishPhase=FinishPhase.PREPARING;
+            if(placeDirty) sendPreview();
+            return;
+        }
+        sendFinishRequest();
+    }
+
+    private void sendFinishRequest() {
+        finishPhase=FinishPhase.FINISHING;
+        ClientPlayNetworking.send(new C2SFinishTreePacket(true));
+    }
+
+    public void onCommitResult(boolean success) {
+        if(finishPhase==FinishPhase.NONE) return;
+        finishPhase=FinishPhase.NONE;
+        Runnable callback=finishCallback;
+        finishCallback=null;
+        if(success) {
+            active=false; target=null; placeDirty=false;
+            if(callback!=null) callback.run();
+        } else toast("treefactory.commit_failed");
     }
     /** Removes the unfinished preview tree from the world. */
     public void cancel() {
@@ -166,7 +194,8 @@ public final class ClientTreeState {
         }));
     }
     public void disconnect() {
-        revision.incrementAndGet(); preview=null;         dirty=true; target=null; active=false; placeDirty=false; presets=BUILT_IN_PRESETS;
+        revision.incrementAndGet(); preview=null; dirty=true; target=null; active=false; placeDirty=false;
+        finishPhase=FinishPhase.NONE; finishCallback=null; presets=BUILT_IN_PRESETS;
         ThumbnailFBOMaker.clear();
         sessionEpoch++;
     }

@@ -7,7 +7,9 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.PictureInPictureRendererRegistry;
 import com.treefactory.light.TreefactoryLight;
 import com.treefactory.light.client.gui.render.*;
+import com.treefactory.light.network.S2CTreeCommitResultPacket;
 import com.mojang.blaze3d.platform.InputConstants;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.KeyMapping;
 
 public class TreefactoryLightClient implements ClientModInitializer {
@@ -21,6 +23,8 @@ public class TreefactoryLightClient implements ClientModInitializer {
 			while (UNDO.consumeClick()) ClientTreeState.INSTANCE.undo();
 		});
 		ClientPlayConnectionEvents.DISCONNECT.register((handler,client) -> client.execute(ClientTreeState.INSTANCE::disconnect));
+		ClientPlayNetworking.registerGlobalReceiver(S2CTreeCommitResultPacket.TYPE,(packet, context) ->
+				context.client().execute(() -> ClientTreeState.INSTANCE.onCommitResult(packet.success())));
 		PictureInPictureRendererRegistry.register(context -> new TreePictureRenderer());
 	}
 }

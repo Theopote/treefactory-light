@@ -9,7 +9,6 @@ import com.treefactory.light.core.algorithm.Voxelizer;
 import com.treefactory.light.core.config.TreeConfig;
 import com.treefactory.light.core.tree.Cell;
 import net.minecraft.core.*;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.*;
 import net.minecraft.resources.*;
@@ -31,6 +30,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiConsumer;
 
 /**
  * Live tree preview. Each player has at most one preview tree placed in the world; moving or editing it
@@ -40,7 +40,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class WorldBatchPaster {
     private static final int FLAGS = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE; // 2 | 16
     private static final int MAX_BUILDS = 4;
-    private static final long THROTTLE_NS = 500_000_000L;
+    private static final long THROTTLE_NS = 150_000_000L;
     private static final long PERSIST_THROTTLE_NS = 2_000_000_000L; // batches frequent preview-footprint writes
     private static final int PLACE_RANGE = 128;
     private record CommittedTree(String dimension, Map<BlockPos,BlockState> placed, Map<BlockPos,BlockState> original) {}
@@ -70,6 +70,15 @@ public final class WorldBatchPaster {
     private MinecraftServer server;
     private boolean dirty;
     private long lastPersistNs;
+    private BiConsumer<ServerPlayer, Boolean> commitNotifier = (player, success) -> {};
+
+    public void setCommitNotifier(BiConsumer<ServerPlayer, Boolean> notifier) {
+        this.commitNotifier = notifier != null ? notifier : (player, success) -> {};
+    }
+
+    private void notifyCommitResult(ServerPlayer player, boolean success) {
+        commitNotifier.accept(player, success);
+    }
     public static boolean holdingWand(ServerPlayer p) {
         return p.getMainHandItem().is(TreefactoryLight.TREE_WAND);
     }
@@ -95,9 +104,16 @@ public final class WorldBatchPaster {
     public void preview(ServerPlayer player, BlockPos origin, TreeConfig config) {
         if (!authorized(player)) return;
         UUID id = player.getUUID();
+        cancelInFlight(id);
         long revision = revisions.next(id);
         queued.put(id, new Request(origin, config, revision));
         startQueued();
+    }
+
+    /** Stops an in-flight generation so a newer preview request can start immediately. */
+    private void cancelInFlight(UUID id) {
+        AtomicBoolean cancel = pending.get(id);
+        if (cancel != null) cancel.set(true);
     }
     private void startQueued() {
         if (server==null) return;
@@ -138,7 +154,10 @@ public final class WorldBatchPaster {
             var result = new com.treefactory.light.core.tree.TreeBuildTask().build(config,cancel::get);
             return result;
         },ForkJoinPool.commonPool()).whenComplete((result,error) -> {
-            if (cancel.get()) return;
+            if (cancel.get()) {
+                running.execute(() -> finishCancelledBuild(id, cancel));
+                return;
+            }
             running.execute(() -> {
                 if (pending.get(id)!=cancel) return;
                 pending.remove(id);
@@ -166,12 +185,19 @@ public final class WorldBatchPaster {
             });
         });
     }
+
+    private void finishCancelledBuild(UUID id, AtomicBoolean cancel) {
+        if (pending.get(id) == cancel) pending.remove(id);
+        startQueued();
+    }
+
     /** Validation failed or generation superseded: never commit a stale preview. */
     private void rejectPreview(ServerPlayer player, long revision, String key) {
         message(player, key);
         if (Objects.equals(revisions.commitTarget(player.getUUID()), revision)) {
             revisions.clearCommitTarget(player.getUUID());
             message(player, "treefactory.commit_failed");
+            notifyCommitResult(player, false);
         }
     }
     private void tryFinishCommit(ServerPlayer player) { tryFinishCommit(player, true); }
@@ -182,6 +208,7 @@ public final class WorldBatchPaster {
             if (revisions.commitTarget(id)!=null && !latestApplied) {
                 revisions.clearCommitTarget(id);
                 message(player, "treefactory.commit_failed");
+                notifyCommitResult(player, false);
             }
             return;
         }
@@ -199,11 +226,15 @@ public final class WorldBatchPaster {
         if (!revisions.readyToCommit(id)) {
             revisions.clearCommitTarget(id);
             message(player, "treefactory.commit_failed");
+            notifyCommitResult(player, false);
             return;
         }
         revisions.clearCommitTarget(id);
         Session session=sessions.remove(id);
-        if (session==null) return;
+        if (session==null) {
+            notifyCommitResult(player, false);
+            return;
+        }
         ArrayDeque<CommittedTree> stack=undo.computeIfAbsent(id, k -> new ArrayDeque<>());
         stack.addLast(new CommittedTree(session.level.dimension().identifier().toString(),
                 Map.copyOf(session.placed), Map.copyOf(session.original)));
@@ -211,6 +242,7 @@ public final class WorldBatchPaster {
         revisions.clear(id);
         persist(true);
         player.sendSystemMessage(Component.translatable("treefactory.built",session.placed.size()),false);
+        notifyCommitResult(player, true);
     }
     public void undo(ServerPlayer player) {
         if (!authorized(player)) return;
