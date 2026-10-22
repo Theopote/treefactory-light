@@ -18,6 +18,25 @@ class PreviewRevisionTest {
         assertTrue(revisions.shouldCommit(player));
     }
 
+    @Test void commitBlockedWhenLatestPreviewNotApplied() {
+        PreviewRevision revisions = new PreviewRevision();
+        UUID player = UUID.randomUUID();
+        long first = revisions.next(player);
+        revisions.markApplied(player, first);
+        revisions.next(player);
+        assertFalse(revisions.readyToCommit(player));
+        revisions.requestCommit(player, first);
+        assertFalse(revisions.readyToCommit(player));
+    }
+
+    @Test void commitAllowedWhenAppliedMatchesLatestWithoutTarget() {
+        PreviewRevision revisions = new PreviewRevision();
+        UUID player = UUID.randomUUID();
+        long revision = revisions.next(player);
+        revisions.markApplied(player, revision);
+        assertTrue(revisions.readyToCommit(player));
+    }
+
     @Test void staleRequestsAreDetected() {
         PreviewRevision revisions = new PreviewRevision();
         UUID player = UUID.randomUUID();

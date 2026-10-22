@@ -196,7 +196,7 @@ public final class WorldBatchPaster {
             startQueued();
             return;
         }
-        if (revisions.commitTarget(id)!=null && !revisions.shouldCommit(id)) {
+        if (!revisions.readyToCommit(id)) {
             revisions.clearCommitTarget(id);
             message(player, "treefactory.commit_failed");
             return;
@@ -230,14 +230,22 @@ public final class WorldBatchPaster {
             message(player,"treefactory.undo_nothing_left");
             return;
         }
-        stack.removeLast();
-        int count=0;
+        int restored=0, failed=0;
         for (var cell : restore.entrySet()) {
-            level.setBlock(cell.getKey(), cell.getValue(), FLAGS);
-            count++;
+            BlockPos pos=cell.getKey();
+            if (!level.getBlockState(pos).equals(tree.placed().get(pos))) continue;
+            if (level.setBlock(pos, cell.getValue(), FLAGS)) restored++;
+            else failed++;
         }
+        if (failed>0) {
+            message(player, restored>0 ? "treefactory.undo_partial_failed" : "treefactory.undo_failed");
+            dirty=true;
+            persist(true);
+            return;
+        }
+        stack.removeLast();
         persist(true);
-        player.sendSystemMessage(Component.translatable("treefactory.undone",count),false);
+        player.sendSystemMessage(Component.translatable("treefactory.undone",restored),false);
     }
     /** Removes the preview tree and restores the world. */
     public void discard(UUID id) {
@@ -377,10 +385,16 @@ public final class WorldBatchPaster {
         }
         dirty=false;
         lastPersistNs=System.nanoTime();
-        return persistQueue.enqueue(this::captureDiskSnapshot, snapshot -> {
-            DiskSnapshot disk=(DiskSnapshot)snapshot;
+        DiskSnapshot snapshot=captureDiskSnapshot();
+        return persistQueue.enqueue(snapshot, payload -> {
+            DiskSnapshot disk=(DiskSnapshot)payload;
             writeToDisk(disk.previews(), disk.undo(), disk.target());
-        }, persistExecutor);
+        }, persistExecutor).whenComplete((ok,error) -> {
+            if (error!=null) {
+                TreefactoryLight.LOGGER.warn("Could not save preview state", error);
+                dirty=true;
+            }
+        });
     }
     private DiskSnapshot captureDiskSnapshot() {
         List<PreviewSnapshot> previews=new ArrayList<>();
@@ -391,7 +405,7 @@ public final class WorldBatchPaster {
         undo.forEach((id,stack) -> undoSnapshot.put(id, List.copyOf(stack)));
         return new DiskSnapshot(previews, undoSnapshot, dataFile());
     }
-    private static void writeToDisk(List<PreviewSnapshot> previews, Map<UUID,List<CommittedTree>> undoSnapshot, Path target) {
+    private static void writeToDisk(List<PreviewSnapshot> previews, Map<UUID,List<CommittedTree>> undoSnapshot, Path target) throws IOException {
         CompoundTag root=new CompoundTag();
         ListTag previewsTag=new ListTag();
         for (PreviewSnapshot snapshot : previews) {
@@ -422,12 +436,9 @@ public final class WorldBatchPaster {
         // Write to a temp file and move it into place so a crash or power loss mid-write cannot leave
         // a corrupted save (which would otherwise lose both the preview footprint and the undo history).
         Path tmp=target.resolveSibling(target.getFileName().toString()+".tmp");
-        try {
-            NbtIo.writeCompressed(root, tmp);
-            try { Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE); }
-            catch (AtomicMoveNotSupportedException e) { Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING); }
-        }
-        catch (IOException e) { TreefactoryLight.LOGGER.warn("Could not save preview state", e); }
+        NbtIo.writeCompressed(root, tmp);
+        try { Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE); }
+        catch (AtomicMoveNotSupportedException e) { Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING); }
     }
     private void load() {
         if (server==null) return;

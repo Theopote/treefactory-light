@@ -99,6 +99,8 @@
   "treefactory.undo_unloaded": "Cannot undo: tree blocks are in unloaded chunks",
   "treefactory.undo_dimension": "Cannot undo: the tree's dimension is unavailable",
   "treefactory.undo_nothing_left": "That tree was already changed; nothing left to undo",
+  "treefactory.undo_failed": "Could not undo the last tree; blocks may have changed",
+  "treefactory.undo_partial_failed": "Undo partially failed; some blocks could not be restored",
   "treefactory.commit_failed": "Could not confirm the tree; adjust placement and try again",
   "treefactory.tree_incomplete": "The tree cannot be placed here without breaking its structure",
   "key.treefactory-light.undo": "Undo last tree",

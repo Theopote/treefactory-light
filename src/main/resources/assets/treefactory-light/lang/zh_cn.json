@@ -99,6 +99,8 @@
   "treefactory.undo_unloaded": "无法撤销：树木方块位于未加载的区块",
   "treefactory.undo_dimension": "无法撤销：树木所在维度不可用",
   "treefactory.undo_nothing_left": "该树木已被修改，没有可恢复的内容",
+  "treefactory.undo_failed": "无法撤销上一棵树，方块可能已被修改",
+  "treefactory.undo_partial_failed": "撤销部分失败，有些方块无法恢复",
   "treefactory.commit_failed": "无法确认建造，请调整放置位置后重试",
   "treefactory.tree_incomplete": "此处无法完整放置树木，结构会遭到破坏",
   "key.treefactory-light.undo": "撤销上一棵树",

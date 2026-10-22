@@ -31,6 +31,18 @@ public final class PreviewRevision {
         return target != null && target.equals(applied.get(player));
     }
 
+    /** Latest preview request was successfully applied to the world. */
+    public boolean isAppliedCurrent(UUID player) {
+        return applied.getOrDefault(player, 0L) == latest.getOrDefault(player, 0L);
+    }
+
+    /** Commit is allowed only when the live preview matches the latest request revision. */
+    public boolean readyToCommit(UUID player) {
+        if (!isAppliedCurrent(player)) return false;
+        Long target = commitTarget.get(player);
+        return target == null || target.equals(applied.get(player));
+    }
+
     public boolean isStale(long revision, UUID player) { return revision < latest(player); }
 
     public void clear(UUID player) {
