@@ -92,10 +92,11 @@ public final class SpaceColonizer {
                         noise.sample(p.x()*.2+17,p.y()*.2,p.z()*.2),noise.sample(p.x()*.2,p.y()*.2,p.z()*.2+31));
                 TreeNode self = nodes.get(i);
                 Vector3 inertia = self.parent()>=0 ? p.subtract(nodes.get(self.parent()).position()).normalize() : new Vector3(0,1,0);
-                boolean droop = config.preset()==TreePreset.WILLOW;
-                Vector3 dir = sum[i].normalize().add(inertia.multiply(1.0)).add(new Vector3(0,droop?-.05:.14,0))
+                BranchMorphology.GrowthBias bias = BranchMorphology.growthBias(config);
+                Vector3 dir = sum[i].normalize().add(inertia.multiply(bias.inertiaWeight()))
+                        .add(new Vector3(0,bias.yBias(),0))
                         .add(perturb.multiply(config.crookedness()*.3)).normalize();
-                if(!droop && dir.y()<0) {
+                if(!bias.allowDownward() && dir.y()<0) {
                     // Never descend, but do not flatten to an exact plane either: a small noise-driven rise.
                     double h=Math.hypot(dir.x(),dir.z());
                     double rise=.04+.14*Math.abs(perturb.y());
@@ -107,6 +108,7 @@ public final class SpaceColonizer {
             }
             if (nodes.size() == before) break;
         }
+        if (BranchMorphology.growsPropRoots(config)) addPropRoots(nodes, occupied, config, random, cancelled);
         if (config.preset() == TreePreset.WILLOW) {
             boolean[] parent = new boolean[nodes.size()];
             for (TreeNode n : nodes) if (n.parent() >= 0) parent[n.parent()] = true;
@@ -127,6 +129,35 @@ public final class SpaceColonizer {
             }
         }
         return List.copyOf(nodes);
+    }
+    /** Mangrove-like presets: diagonal stilt roots from the lower trunk. */
+    private static void addPropRoots(List<TreeNode> nodes, Set<Cell> occupied, TreeConfig config, Random random,
+                                     BooleanSupplier cancelled) {
+        int maxTrunk = Math.min(nodes.size(), (int)(config.height() * 0.15) + 2);
+        if (maxTrunk < 2) return;
+        int roots = 4 + random.nextInt(3);
+        for (int r = 0; r < roots && nodes.size() < MAX_NODES; r++) {
+            check(cancelled);
+            int anchor = 1 + random.nextInt(maxTrunk - 1);
+            double angle = random.nextDouble() * Math.PI * 2;
+            double down = 0.35 + config.branchDroop() * 0.45;
+            double out = 0.45 + config.spread() * 0.75;
+            int parent = anchor;
+            int steps = 3 + (int)(config.height() * 0.07);
+            for (int step = 0; step < steps && nodes.size() < MAX_NODES; step++) {
+                check(cancelled);
+                Vector3 base = nodes.get(parent).position();
+                Vector3 next = base.add(new Vector3(Math.cos(angle) * out, -down, Math.sin(angle) * out));
+                if (next.y() < 0.5 || !occupied.add(quantize(next))) break;
+                nodes.add(new TreeNode(next, parent, 0.45));
+                parent = nodes.size() - 1;
+                out *= 0.88;
+                down *= 0.92;
+            }
+        }
+    }
+    private static void check(BooleanSupplier cancelled) {
+        if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) throw new CancellationException();
     }
     private static Cell quantize(Vector3 p) { return bucket(p,.55); }
     private static Cell bucket(Vector3 p, double size) {

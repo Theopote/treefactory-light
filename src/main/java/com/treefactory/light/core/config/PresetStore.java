@@ -68,6 +68,11 @@ public final class PresetStore {
         canopy.addProperty("scale",c.canopyScale()); canopy.addProperty("density",c.attractionDensity());
         canopy.addProperty("pipe_exponent",c.pipeExponent()); canopy.addProperty("trunk_thickness",c.trunkThickness());
         canopy.addProperty("crown_stretch",c.crownStretch()); canopy.addProperty("crown_layers",c.crownLayers()); root.add("canopy",canopy);
+        JsonObject morphology=new JsonObject();
+        morphology.addProperty("branch_angle_bias",c.branchAngleBias());
+        morphology.addProperty("branch_droop",c.branchDroop());
+        morphology.addProperty("apical_dominance",c.apicalDominance());
+        root.add("morphology",morphology);
         JsonObject palette = new JsonObject();
         BlockPalette p=c.blockPalette();
         palette.addProperty("log_block",p.mainTrunk()); palette.addProperty("leaves_block",p.primaryLeaf());
@@ -97,12 +102,16 @@ public final class PresetStore {
                 palette.get("accent_block").getAsString(),palette.get("primary_weight").getAsDouble(),
                 palette.get("secondary_weight").getAsDouble(),palette.get("accent_weight").getAsDouble());
         double height=root.has("height")?root.get("height").getAsDouble():legacy.height();
+        JsonObject morphology=root.has("morphology")?root.getAsJsonObject("morphology"):null;
+        double angleBias=morphology!=null && morphology.has("branch_angle_bias")?morphology.get("branch_angle_bias").getAsDouble():TreeConfig.DEFAULT_BRANCH_ANGLE_BIAS;
+        double droop=morphology!=null && morphology.has("branch_droop")?morphology.get("branch_droop").getAsDouble():TreeConfig.DEFAULT_BRANCH_DROOP;
+        double apical=morphology!=null && morphology.has("apical_dominance")?morphology.get("apical_dominance").getAsDouble():TreeConfig.DEFAULT_APICAL_DOMINANCE;
         TreeConfig config=new TreeConfig(type,legacy.scale(),legacy.seed(),legacy.crookedness(),legacy.spread(),legacy.fullness(),
                 CanopyShape.valueOf(canopy.get("shape").getAsString().toUpperCase(Locale.ROOT)),canopy.get("scale").getAsDouble(),
                 canopy.get("density").getAsDouble(),canopy.get("pipe_exponent").getAsDouble(),blocks,height,
                 canopy.has("trunk_thickness")?canopy.get("trunk_thickness").getAsDouble():1.0,
                 canopy.has("crown_stretch")?canopy.get("crown_stretch").getAsDouble():1.0,
-                canopy.has("crown_layers")?canopy.get("crown_layers").getAsInt():3);
+                canopy.has("crown_layers")?canopy.get("crown_layers").getAsInt():3,angleBias,droop,apical);
         return new Preset(id,name,author,config);
     }
 }
