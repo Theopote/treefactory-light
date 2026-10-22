@@ -29,7 +29,8 @@ final class MaterialPanel {
             "treefactory.role.trunk", "treefactory.role.thick_branch", "treefactory.role.thin_branch",
             "treefactory.role.primary_leaf", "treefactory.role.secondary_leaf", "treefactory.role.accent"
     };
-    private static final int CELL = 20;
+    private static final int GRID_COLS = 8;
+    private static final int GRID_CELL = 18;
     private static final Map<Role, List<Block>> CANDIDATES = new EnumMap<>(Role.class);
     private static int cacheEpoch = -1;
 
@@ -45,14 +46,14 @@ final class MaterialPanel {
     private List<Block> cachedVisible = List.of();
     private DNAControlSlider secondarySlider, accentSlider;
 
-    private static final int TAB_HEIGHT = 22;
+    private static final int TAB_SIZE = 22;
 
-    /** Icon-only role tab; full name shown below the tab row. */
+    /** Square icon-only role tab; full name shown below the tab row. */
     private final class RoleTab extends Button {
         private final Role tabRole;
 
-        RoleTab(int x, int y, int w, int h, Role tabRole, Component label) {
-            super(x, y, w, h, label, b -> { role = tabRole; scroll = 0; }, DEFAULT_NARRATION);
+        RoleTab(int x, int y, Role tabRole, Component label) {
+            super(x, y, TAB_SIZE, TAB_SIZE, label, b -> { role = tabRole; scroll = 0; }, DEFAULT_NARRATION);
             this.tabRole = tabRole;
         }
 
@@ -61,30 +62,34 @@ final class MaterialPanel {
             g.fill(getX(), getY(), getX() + width, getY() + height, isHovered() ? 0xFF234A40 : 0xFF14261F);
             g.outline(getX(), getY(), width, height, tabRole == role ? 0xFF69DFB1 : 0xFF37584D);
             block(idOf(tabRole, state.config().blockPalette()))
-                    .ifPresent(b -> g.item(new ItemStack(b), getX() + (width - 16) / 2, getY() + 3));
+                    .ifPresent(b -> g.item(new ItemStack(b), getX() + (width - 16) / 2, getY() + (height - 16) / 2));
         }
     }
 
-    static int widthFor(int screenWidth) { return Math.clamp(screenWidth / 3, 200, 280); }
+    static int widthFor(int screenWidth) { return GRID_COLS * GRID_CELL + 16; }
+
+    private int cellSize() { return GRID_CELL; }
 
     void init(Font font, int left, int width, int height, Consumer<AbstractWidget> add, Runnable close, Runnable rebuild) {
         this.x = left;
         this.width = width;
         this.height = height;
-        this.gridTop = 22 + TAB_HEIGHT + 18 + 24;
+        this.gridTop = 22 + TAB_SIZE + 18 + 24;
         this.gridBottom = height - 78;
         this.rebuild = rebuild;
         add.accept(Button.builder(Component.literal("✕"), b -> close.run()).bounds(left + width - 26, 4, 20, 16)
                 .tooltip(Tooltip.create(Component.translatable("treefactory.materials.close.tip"))).build());
-        int tabW = (width - 16) / ROLES.length;
+        int rowW = width - 16;
+        int tabGap = Math.max(2, (rowW - ROLES.length * TAB_SIZE) / (ROLES.length + 1));
+        int tabX = left + 8 + tabGap;
         for (int i = 0; i < ROLES.length; i++) {
             Role r = ROLES[i];
-            RoleTab tab = new RoleTab(left + 8 + i * tabW, 22, tabW - 2, TAB_HEIGHT, r, Component.translatable(ROLE_KEYS[i]));
+            RoleTab tab = new RoleTab(tabX + i * (TAB_SIZE + tabGap), 22, r, Component.translatable(ROLE_KEYS[i]));
             tab.setTooltip(Tooltip.create(Component.translatable(ROLE_KEYS[i]).append("\n")
                     .append(Component.translatable("treefactory.materials.tab.tip"))));
             add.accept(tab);
         }
-        EditBox search = new EditBox(font, left + 8, 22 + TAB_HEIGHT + 18, width - 16, 16,
+        EditBox search = new EditBox(font, left + 8, 22 + TAB_SIZE + 18, width - 16, 16,
                 Component.translatable("treefactory.materials.search"));
         search.setHint(Component.translatable("treefactory.materials.search"));
         search.setTooltip(Tooltip.create(Component.translatable("treefactory.materials.search.tip")));
@@ -164,11 +169,12 @@ final class MaterialPanel {
         return result;
     }
 
-    private int columns() { return Math.max(1, (width - 16) / CELL); }
+    private int columns() { return GRID_COLS; }
 
     private int maxScroll(int count) {
-        int rows = (count + columns() - 1) / columns();
-        return Math.max(0, rows * CELL - (gridBottom - gridTop));
+        int cell = cellSize();
+        int rows = (count + GRID_COLS - 1) / GRID_COLS;
+        return Math.max(0, rows * cell - (gridBottom - gridTop));
     }
 
     void render(GuiGraphicsExtractor g, Font font, int mouseX, int mouseY) {
@@ -177,7 +183,7 @@ final class MaterialPanel {
         g.text(font, Component.translatable("treefactory.materials.title"), x + 8, 8, 0xFFB8F8D2);
 
         Component roleName = Component.translatable(ROLE_KEYS[role.ordinal()]);
-        g.text(font, roleName, x + 8, 22 + TAB_HEIGHT + 2, 0xFFE2F5E9);
+        g.text(font, roleName, x + 8, 22 + TAB_SIZE + 2, 0xFFE2F5E9);
 
         var palette = state.config().blockPalette();
         double primary = Math.max(0, 1 - palette.secondaryWeight() - palette.accentWeight());
@@ -188,20 +194,20 @@ final class MaterialPanel {
         List<Block> blocks = visible();
         scroll = Math.clamp(scroll, 0, maxScroll(blocks.size()));
         String current = idOf(role, state.config().blockPalette());
-        int cols = columns(), originX = x + 8;
+        int cell = cellSize(), cols = columns(), originX = x + 8, iconInset = (cell - 16) / 2;
         hovered = null;
         g.enableScissor(x, gridTop, x + width, gridBottom);
         for (int i = 0; i < blocks.size(); i++) {
-            int cx = originX + (i % cols) * CELL, cy = gridTop + (i / cols) * CELL - scroll;
-            if (cy + CELL < gridTop || cy > gridBottom) continue;
+            int cx = originX + (i % cols) * cell, cy = gridTop + (i / cols) * cell - scroll;
+            if (cy + cell < gridTop || cy > gridBottom) continue;
             Block b = blocks.get(i);
-            boolean over = mouseX >= cx && mouseX < cx + CELL && mouseY >= cy && mouseY < cy + CELL
+            boolean over = mouseX >= cx && mouseX < cx + cell && mouseY >= cy && mouseY < cy + cell
                     && mouseY >= gridTop && mouseY < gridBottom;
             if (over) hovered = b;
             boolean selected = PaletteRules.id(b).equals(current);
-            g.fill(cx, cy, cx + CELL - 1, cy + CELL - 1, over ? 0xFF234A40 : 0xFF14261F);
-            if (selected) g.outline(cx, cy, CELL - 1, CELL - 1, 0xFF69DFB1);
-            g.item(new ItemStack(b), cx + 1, cy + 1);
+            g.fill(cx, cy, cx + cell - 1, cy + cell - 1, over ? 0xFF234A40 : 0xFF14261F);
+            if (selected) g.outline(cx, cy, cell - 1, cell - 1, 0xFF69DFB1);
+            g.item(new ItemStack(b), cx + iconInset, cy + iconInset);
         }
         g.disableScissor();
         if (blocks.isEmpty()) g.text(font, Component.translatable("treefactory.materials.none"), x + 8, gridTop + 4, 0xFFB0C9BC);
@@ -214,8 +220,9 @@ final class MaterialPanel {
 
     boolean click(double mx, double my) {
         if (mx < x || mx >= x + width || my < gridTop || my >= gridBottom) return false;
-        int col = (int) ((mx - (x + 8)) / CELL), row = (int) ((my - gridTop + scroll) / CELL);
-        if (mx < x + 8 || col >= columns()) return true;
+        int cell = cellSize();
+        int col = (int) ((mx - (x + 8)) / cell), row = (int) ((my - gridTop + scroll) / cell);
+        if (mx < x + 8 || col < 0 || col >= columns()) return true;
         List<Block> blocks = visible();
         int index = row * columns() + col;
         if (index >= 0 && index < blocks.size()) {
@@ -227,7 +234,7 @@ final class MaterialPanel {
 
     boolean scrolled(double mx, double my, double vertical) {
         if (mx < x || mx >= x + width || my < gridTop - 20 || my >= gridBottom) return false;
-        scroll = Math.clamp(scroll - (int) (vertical * CELL * 2), 0, maxScroll(visible().size()));
+        scroll = Math.clamp(scroll - (int) (vertical * cellSize() * 2), 0, maxScroll(visible().size()));
         return true;
     }
 }

@@ -181,15 +181,14 @@ public final class DrawerScreen extends Screen {
         materialsBtn.setMessage(Component.translatable("treefactory.choose_materials").append(materialsOpen ? " ▶" : " ▼"));
         addContent(materialsBtn);
         y += 24;
-        int saveW = Math.min(56, Math.max(44, font.width(Component.translatable("treefactory.save_preset")) + 10));
-        int nameW = w - saveW - 2;
-        EditBox presetNameBox = new EditBox(font, M, y - scroll, nameW, 20, Component.translatable("treefactory.preset_name"));
+        int saveHalf = (w - 2) / 2;
+        EditBox presetNameBox = new EditBox(font, M, y - scroll, saveHalf, 20, Component.translatable("treefactory.preset_name"));
         presetNameBox.setMaxLength(64);
         presetNameBox.setValue(presetName);
         presetNameBox.setHint(Component.translatable("treefactory.preset_name"));
         presetNameBox.setResponder(v -> presetName = v);
         addContent(presetNameBox);
-        addContent(button(M + nameW + 2, y - scroll, saveW, "treefactory.save_preset", () -> state.save(presetName)));
+        addContent(button(M + saveHalf + 2, y - scroll, saveHalf, "treefactory.save_preset", () -> state.save(presetName)));
         y += 22;
         contentHeight = y - TOP;
     }
