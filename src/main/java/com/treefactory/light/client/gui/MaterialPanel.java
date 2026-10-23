@@ -32,10 +32,12 @@ final class MaterialPanel {
     private static final int GRID_COLS = 8;
     private static final int GRID_CELL = 18;
     private static final Map<Role, List<Block>> CANDIDATES = new EnumMap<>(Role.class);
+    private static final Map<Role, List<Block>> ALL_CANDIDATES = new EnumMap<>(Role.class);
     private static int cacheEpoch = -1;
 
     private final ClientTreeState state = ClientTreeState.INSTANCE;
     private Role role = Role.TRUNK;
+    private boolean showAll;
     private String rawQuery = "", query = "";
     private int scroll;
     private int x, width, height, gridTop = 66, gridBottom;
@@ -97,6 +99,14 @@ final class MaterialPanel {
         search.setValue(rawQuery);
         search.setResponder(value -> { rawQuery = value; query = value.toLowerCase(Locale.ROOT).trim(); scroll = 0; });
         add.accept(search);
+        Button more = Button.builder(Component.translatable(showAll ? "treefactory.materials.less" : "treefactory.materials.more"), b -> {
+            showAll = !showAll;
+            scroll = 0;
+            cachedVisible = null;
+            rebuild.run();
+        }).bounds(left + width - 8 - 70, 22 + TAB_SIZE, 70, 14)
+                .tooltip(Tooltip.create(Component.translatable("treefactory.materials.more.tip"))).build();
+        add.accept(more);
         var palette = state.config().blockPalette();
         int half = (width - 18) / 2;
         secondarySlider = new DNAControlSlider(left + 8, height - 46, half, "treefactory.secondary_weight", palette.secondaryWeight(),
@@ -148,11 +158,14 @@ final class MaterialPanel {
     private List<Block> visible() {
         if (cacheEpoch != ClientTreeState.sessionEpoch) {
             CANDIDATES.clear();
+            ALL_CANDIDATES.clear();
             cacheEpoch = ClientTreeState.sessionEpoch;
             cachedVisible = null;
         }
         if (cachedVisible != null && role == cachedRole && query.equals(cachedQuery)) return cachedVisible;
-        List<Block> all = CANDIDATES.computeIfAbsent(role, PaletteRules::candidates);
+        List<Block> all = showAll
+                ? ALL_CANDIDATES.computeIfAbsent(role, r -> PaletteRules.candidates(r, true))
+                : CANDIDATES.computeIfAbsent(role, PaletteRules::candidates);
         List<Block> result;
         if (query.isEmpty()) result = all;
         else {
