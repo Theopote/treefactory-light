@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class TreePlacementValidatorTest {
-    @Test void rejectsWhenWoodyStructureIsBlocked() {
+    @Test void rejectsWhenNoWoodyBlockCanBePlaced() {
         Map<Cell, Voxelizer.Material> blocks = Map.of(
                 new Cell(0, 0, 0), Voxelizer.Material.MAIN_TRUNK,
                 new Cell(1, 1, 0), Voxelizer.Material.PRIMARY_LEAF);
@@ -18,6 +18,15 @@ class TreePlacementValidatorTest {
                 cell -> true, cell -> true);
         assertFalse(result.ok());
         assertEquals("treefactory.target_unloaded", result.messageKey());
+    }
+
+    @Test void skipsBlockedWoodyBlocksInsteadOfFailing() {
+        Map<Cell, Voxelizer.Material> blocks = new LinkedHashMap<>();
+        blocks.put(new Cell(0, 0, 0), Voxelizer.Material.MAIN_TRUNK);
+        blocks.put(new Cell(0, 1, 0), Voxelizer.Material.MAIN_TRUNK);
+        var result = TreePlacementValidator.validate(blocks, cell -> null, cell -> true, cell -> cell.y() == 0);
+        assertTrue(result.ok());
+        assertEquals(1, result.placeable().size());
     }
 
     @Test void allowsLeafSkipsWhileKeepingWoodyBlocks() {

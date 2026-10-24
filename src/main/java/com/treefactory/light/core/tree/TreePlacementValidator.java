@@ -4,7 +4,7 @@ import com.treefactory.light.core.algorithm.Voxelizer;
 import java.util.*;
 import java.util.function.Predicate;
 
-/** Pre-placement checks: woody structure must be complete; leaves may be skipped. */
+/** Pre-placement filter: blocked cells are skipped; placement fails only if no woody block can be placed. */
 public final class TreePlacementValidator {
     public record Result(boolean ok, String messageKey, Map<Cell, Voxelizer.Material> placeable) {
         public static Result ok(Map<Cell, Voxelizer.Material> placeable) {
@@ -26,21 +26,20 @@ public final class TreePlacementValidator {
             java.util.function.Function<Cell, String> accessibility,
             Predicate<Cell> canInteract, Predicate<Cell> replaceable) {
         Map<Cell, Voxelizer.Material> placeable = new LinkedHashMap<>();
+        String firstBlock = null;
+        boolean anyWoody = false;
         for (var entry : blocks.entrySet()) {
             Cell cell = entry.getKey();
             Voxelizer.Material material = entry.getValue();
             String blocked = accessibility.apply(cell);
-            boolean allowed = blocked == null && canInteract.test(cell) && replaceable.test(cell);
-            if (material.woody()) {
-                if (!allowed) return Result.fail(blocked != null ? blocked : "treefactory.target_protected");
-            } else if (allowed) {
-                placeable.put(cell, material);
-            }
+            // Occupied, protected or unloaded cells are simply skipped; the tree grows around obstacles.
+            if (blocked == null && canInteract.test(cell) && replaceable.test(cell)) placeable.put(cell, material);
+            else if (material.woody() && firstBlock == null)
+                firstBlock = blocked != null ? blocked : "treefactory.target_protected";
+            anyWoody |= material.woody();
         }
-        for (var entry : blocks.entrySet()) {
-            if (entry.getValue().woody()) placeable.put(entry.getKey(), entry.getValue());
-        }
-        if (placeable.values().stream().noneMatch(Voxelizer.Material::woody)) return Result.fail("treefactory.tree_incomplete");
+        if (placeable.values().stream().noneMatch(Voxelizer.Material::woody))
+            return Result.fail(anyWoody && firstBlock != null ? firstBlock : "treefactory.tree_incomplete");
         return Result.ok(placeable);
     }
 }
