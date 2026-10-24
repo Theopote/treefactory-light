@@ -2,6 +2,7 @@ package com.treefactory.light.client;
 
 import com.treefactory.light.TreefactoryLight;
 import com.treefactory.light.core.config.*;
+import com.treefactory.light.core.tree.Cell;
 import com.treefactory.light.core.tree.TreeBuildTask;
 import com.treefactory.light.network.*;
 import com.treefactory.light.util.WorldBatchPaster;
@@ -26,7 +27,7 @@ public final class ClientTreeState {
     private final AtomicLong revision=new AtomicLong();
     private long changedAt=System.nanoTime();
     private boolean dirty=true, generating;
-    private BlockPos target;
+    private BlockPos target, previewOrigin;
     private boolean placeDirty, active;
     private long placeChangedAt;
     private static final List<PresetStore.Preset> BUILT_IN_PRESETS=BuiltInPresets.all();
@@ -55,28 +56,64 @@ public final class ClientTreeState {
         var p=Minecraft.getInstance().player;
         return p!=null && p.getMainHandItem().is(TreefactoryLight.TREE_WAND);
     }
-    /** Placement point for a ray that hit the world. Any block can act as the support, so long as the
-     * cursor is over it; we anchor to the clicked block's top surface instead of requiring an UP face hit. */
+    /**
+     * Placement point for a ray that hit the world. Any block can be the support: the tree starts on top of the
+     * clicked block. Non-solid decoration (flowers, torches, ...) is looked through to the support below it.
+     */
     private BlockPos origin(HitResult hit) {
-        if(!(hit instanceof BlockHitResult block) || hit.getType()!=HitResult.Type.BLOCK || Minecraft.getInstance().level==null) return null;
+        var level=Minecraft.getInstance().level;
+        if(!(hit instanceof BlockHitResult block) || hit.getType()!=HitResult.Type.BLOCK || level==null) return null;
         BlockPos clicked=block.getBlockPos();
-        return Minecraft.getInstance().level.getBlockState(clicked).canBeReplaced() ? clicked : clicked.above();
+        if(level.getBlockState(clicked).canBeReplaced()) return clicked;
+        BlockPos pos=clicked;
+        for(int i=0;i<10 && isDecoration(level,pos);i++) pos=pos.below();
+        return isDecoration(level,pos) ? clicked.above() : pos.above();
+    }
+    private static boolean isDecoration(net.minecraft.world.level.BlockGetter level,BlockPos pos) {
+        var state=level.getBlockState(pos);
+        return !state.hasBlockEntity() && state.getCollisionShape(level,pos).isEmpty() && state.getFluidState().isEmpty();
+    }
+    /** World-space direction of the ray through a GUI point, from the camera's real projection (includes dynamic FOV). */
+    private static Vec3 cursorRay(Minecraft mc,double guiX,double guiY) {
+        double ndcX=guiX/mc.getWindow().getGuiScaledWidth()*2-1, ndcY=1-guiY/mc.getWindow().getGuiScaledHeight()*2;
+        var camera=mc.gameRenderer.mainCamera();
+        var inverse=camera.getViewRotationProjectionMatrix(new org.joml.Matrix4f()).invert();
+        var near=new org.joml.Vector4f((float)ndcX,(float)ndcY,-1f,1f).mul(inverse);
+        var far=new org.joml.Vector4f((float)ndcX,(float)ndcY,1f,1f).mul(inverse);
+        near.div(near.w); far.div(far.w);
+        Vec3 dir=new Vec3(far.x-near.x,far.y-near.y,far.z-near.z).normalize();
+        var forward=camera.rotation().transform(new org.joml.Vector3f(0,0,-1));
+        // Depth conventions differ between projections; the ray must always point into the screen.
+        return dir.x*forward.x+dir.y*forward.y+dir.z*forward.z<0 ? dir.scale(-1) : dir;
     }
     /** Places the tree where the cursor points; guiX/guiY are in scaled GUI coordinates. */
     public void placeAtCursor(double guiX,double guiY) {
         Minecraft mc=Minecraft.getInstance();
         if(mc.player==null || mc.level==null) return;
-        double ndcX=guiX/mc.getWindow().getGuiScaledWidth()*2-1, ndcY=1-guiY/mc.getWindow().getGuiScaledHeight()*2;
-        double tan=Math.tan(Math.toRadians(mc.options.fov().get())/2);
-        double aspect=(double)mc.getWindow().getWidth()/mc.getWindow().getHeight();
-        Vec3 forward=mc.player.getViewVector(1f), right=forward.cross(new Vec3(0,1,0)).normalize();
-        Vec3 up=right.cross(forward).normalize();
-        Vec3 dir=forward.add(right.scale(ndcX*aspect*tan)).add(up.scale(ndcY*tan)).normalize();
-        Vec3 eye=mc.player.getEyePosition();
-        var hit=mc.level.clip(new ClipContext(eye,eye.add(dir.scale(256)),ClipContext.Block.OUTLINE,ClipContext.Fluid.NONE,mc.player));
-        BlockPos pos=origin(hit);
+        Vec3 dir=cursorRay(mc,guiX,guiY), eye=mc.gameRenderer.mainCamera().position();
+        BlockPos pos=origin(clipIgnoringPreview(mc,eye,dir));
         if(pos==null) { toast("treefactory.aim_first"); return; }
         setTarget(pos);
+    }
+    /**
+     * The preview tree is made of real blocks, so a plain ray would hit the tree (trunk, canopy) instead of the
+     * ground behind it and the new tree would be placed one block above the preview. Preview blocks are skipped.
+     */
+    private HitResult clipIgnoringPreview(Minecraft mc,Vec3 eye,Vec3 dir) {
+        Set<BlockPos> own=new HashSet<>();
+        if(previewOrigin!=null && preview!=null)
+            for(Cell cell:preview.tree().blocks().keySet()) own.add(previewOrigin.offset(cell.x(),cell.y(),cell.z()));
+        Vec3 end=eye.add(dir.scale(WorldBatchPaster.PLACE_RANGE)), start=eye;
+        for(int i=0;i<256;i++) {
+            var hit=mc.level.clip(new ClipContext(start,end,ClipContext.Block.OUTLINE,ClipContext.Fluid.NONE,mc.player));
+            if(hit.getType()!=HitResult.Type.BLOCK || !own.contains(hit.getBlockPos())) return hit;
+            BlockPos skipped=hit.getBlockPos();
+            start=hit.getLocation();
+            // Step out of the skipped block so the next clip cannot hit it again from the inside.
+            for(int s=0;s<40 && BlockPos.containing(start).equals(skipped);s++) start=start.add(dir.scale(.1));
+            if(BlockPos.containing(start).equals(skipped)) break;
+        }
+        return mc.level.clip(new ClipContext(start,end,ClipContext.Block.OUTLINE,ClipContext.Fluid.NONE,mc.player));
     }
     private void setTarget(BlockPos pos) {
         target=pos; active=true; placeDirty=true; placeChangedAt=0;
@@ -110,6 +147,7 @@ public final class ClientTreeState {
     private void sendPreview() {
         placeDirty=false; placeChangedAt=System.nanoTime();
         if(!ClientPlayNetworking.canSend(C2SPreviewTreePacket.TYPE)) { toast("treefactory.no_server"); return; }
+        previewOrigin=target;
         ClientPlayNetworking.send(new C2SPreviewTreePacket(target,config));
     }
     /** Requests permanent placement; {@code onSuccess} runs only after the server confirms. */
@@ -137,14 +175,14 @@ public final class ClientTreeState {
         Runnable callback=finishCallback;
         finishCallback=null;
         if(success) {
-            active=false; target=null; placeDirty=false;
+            active=false; target=null; placeDirty=false; previewOrigin=null;
             if(callback!=null) callback.run();
         } else toast("treefactory.commit_failed");
     }
     /** Removes the unfinished preview tree from the world. */
     public void cancel() {
         if(active && ClientPlayNetworking.canSend(C2SFinishTreePacket.TYPE)) ClientPlayNetworking.send(new C2SFinishTreePacket(false));
-        active=false; target=null; placeDirty=false;
+        active=false; target=null; placeDirty=false; previewOrigin=null;
     }
     public void undo() {
         if(!ClientPlayNetworking.canSend(C2SUndoTreePacket.TYPE)) { toast("treefactory.no_server"); return; }
@@ -193,7 +231,7 @@ public final class ClientTreeState {
         }));
     }
     public void disconnect() {
-        revision.incrementAndGet(); preview=null; dirty=true; target=null; active=false; placeDirty=false;
+        revision.incrementAndGet(); preview=null; dirty=true; target=null; previewOrigin=null; active=false; placeDirty=false;
         finishPhase=FinishPhase.NONE; finishCallback=null; presets=BUILT_IN_PRESETS;
         ThumbnailFBOMaker.clear();
         sessionEpoch++;

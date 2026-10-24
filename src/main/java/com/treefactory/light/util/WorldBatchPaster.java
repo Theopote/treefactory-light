@@ -17,6 +17,7 @@ import net.minecraft.server.level.*;
 import net.minecraft.network.chat.Component;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.EmptyBlockGetter;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.block.*;
 import net.minecraft.world.level.block.state.BlockState;
@@ -42,7 +43,8 @@ public final class WorldBatchPaster {
     private static final int MAX_BUILDS = 4;
     private static final long THROTTLE_NS = 150_000_000L;
     private static final long PERSIST_THROTTLE_NS = 2_000_000_000L; // batches frequent preview-footprint writes
-    private static final int PLACE_RANGE = 128;
+    /** Farthest distance, in blocks, at which a preview tree may be placed; the client ray uses the same limit. */
+    public static final int PLACE_RANGE = 512;
     private record CommittedTree(String dimension, Map<BlockPos,BlockState> placed, Map<BlockPos,BlockState> original) {}
     private record PreviewSnapshot(UUID player, String dimension, boolean closing,
                                     Map<BlockPos,BlockState> placed, Map<BlockPos,BlockState> original) {}
@@ -391,7 +393,8 @@ public final class WorldBatchPaster {
                 ChunkStatus.FULL, false) != null;
     }
     private static boolean replaceable(BlockState state) {
-        return !state.hasBlockEntity() && (state.isAir() || state.canBeReplaced() || state.is(BlockTags.LEAVES));
+        return !state.hasBlockEntity() && (state.isAir() || state.canBeReplaced() || state.is(BlockTags.LEAVES)
+                || (state.getCollisionShape(EmptyBlockGetter.INSTANCE,BlockPos.ZERO).isEmpty() && state.getFluidState().isEmpty()));
     }
     private static boolean authorized(ServerPlayer p) {
         if (!p.isCreative() || !holdingWand(p)) { message(p,"treefactory.creative_only"); return false; }
