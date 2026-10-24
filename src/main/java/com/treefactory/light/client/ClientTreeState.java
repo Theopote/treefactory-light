@@ -11,7 +11,6 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.*;
@@ -56,10 +55,10 @@ public final class ClientTreeState {
         var p=Minecraft.getInstance().player;
         return p!=null && p.getMainHandItem().is(TreefactoryLight.TREE_WAND);
     }
-    /** Placement point for a ray that hit the world; only upward faces of ground blocks are valid. */
+    /** Placement point for a ray that hit the world. Any block can act as the support, so long as the
+     * cursor is over it; we anchor to the clicked block's top surface instead of requiring an UP face hit. */
     private BlockPos origin(HitResult hit) {
-        if(!(hit instanceof BlockHitResult block) || hit.getType()!=HitResult.Type.BLOCK
-                || block.getDirection()!=Direction.UP || Minecraft.getInstance().level==null) return null;
+        if(!(hit instanceof BlockHitResult block) || hit.getType()!=HitResult.Type.BLOCK || Minecraft.getInstance().level==null) return null;
         BlockPos clicked=block.getBlockPos();
         return Minecraft.getInstance().level.getBlockState(clicked).canBeReplaced() ? clicked : clicked.above();
     }
