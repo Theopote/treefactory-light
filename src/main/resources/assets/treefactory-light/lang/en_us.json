@@ -133,6 +133,7 @@
   "treefactory.fullness.tip": "How densely the crown is filled with leaves.",
   "treefactory.generator.tip": "Adjust the tree shape and materials.",
   "treefactory.library.tip": "Browse and load saved presets.",
+  "treefactory.materials.close": "Close",
   "treefactory.materials.close.tip": "Close the palette panel.",
   "treefactory.materials.reset.tip": "Restore the default blocks and weights.",
   "treefactory.materials.search.tip": "Filter blocks by name or id.",

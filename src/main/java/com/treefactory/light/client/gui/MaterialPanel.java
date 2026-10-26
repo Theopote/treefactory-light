@@ -79,8 +79,6 @@ final class MaterialPanel {
         this.gridTop = 22 + TAB_SIZE + 18 + 24;
         this.gridBottom = height - 78;
         this.rebuild = rebuild;
-        add.accept(Button.builder(Component.literal("✕"), b -> close.run()).bounds(left + width - 26, 4, 20, 16)
-                .tooltip(Tooltip.create(Component.translatable("treefactory.materials.close.tip"))).build());
         int rowW = width - 16;
         int tabGap = Math.max(2, (rowW - ROLES.length * TAB_SIZE) / (ROLES.length + 1));
         int tabX = left + 8 + tabGap;
@@ -118,8 +116,11 @@ final class MaterialPanel {
         add.accept(Button.builder(Component.translatable("treefactory.materials.reset"), b -> {
             state.update(state.config().withBlockPalette(defaults()));
             rebuild.run();
-        }).bounds(left + 8, height - 22, width - 16, 20)
+        }).bounds(left + 8, height - 22, half, 20)
                 .tooltip(Tooltip.create(Component.translatable("treefactory.materials.reset.tip"))).build());
+        add.accept(Button.builder(Component.translatable("treefactory.materials.close"), b -> close.run())
+                .bounds(left + 10 + half, height - 22, half, 20)
+                .tooltip(Tooltip.create(Component.translatable("treefactory.materials.close.tip"))).build());
     }
 
     private BlockPalette defaults() {
@@ -193,7 +194,8 @@ final class MaterialPanel {
     void render(GuiGraphicsExtractor g, Font font, int mouseX, int mouseY) {
         g.fill(x, 0, x + width, height, 0xF00B1814);
         g.fill(x + width - 1, 0, x + width, height, 0xFF4C876C);
-        g.text(font, Component.translatable("treefactory.materials.title"), x + 8, 8, 0xFFB8F8D2);
+        g.fill(x, 0, x + width - 1, 16, 0xFF3C3F3E);
+        g.text(font, Component.translatable("treefactory.materials.title"), x + 6, 4, 0xFFB8F8D2);
 
         Component roleName = Component.translatable(ROLE_KEYS[role.ordinal()]);
         g.text(font, roleName, x + 8, 22 + TAB_SIZE + 2, 0xFFE2F5E9);
