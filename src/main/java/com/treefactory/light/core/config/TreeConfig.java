@@ -13,7 +13,7 @@ public record TreeConfig(TreePreset preset, TreeScale scale, long seed,
     public static final double MIN_HEIGHT=6, MAX_HEIGHT=48, MIN_THICKNESS=.5, MAX_THICKNESS=2.0, MIN_STRETCH=.6, MAX_STRETCH=2.0;
     public static final int MIN_LAYERS=3, MAX_LAYERS=6;
     public static final double DEFAULT_BRANCH_ANGLE_BIAS=.5, DEFAULT_BRANCH_DROOP=0, DEFAULT_APICAL_DOMINANCE=.5,
-            DEFAULT_GRAVITY_INFLUENCE=.5, MIN_CROWN_BASE=0, MAX_CROWN_BASE=.5, DEFAULT_CROWN_BASE=.25;
+            DEFAULT_GRAVITY_INFLUENCE=.5, MIN_CROWN_BASE=.1, MAX_CROWN_BASE=.7, DEFAULT_CROWN_BASE=.3;
     public TreeConfig {
         Objects.requireNonNull(preset);
         Objects.requireNonNull(scale);
@@ -65,7 +65,7 @@ public record TreeConfig(TreePreset preset, TreeScale scale, long seed,
         this(preset,scale,seed,crookedness,spread,fullness,canopyShape,canopyScale,attractionDensity,pipeExponent,blockPalette,height,trunkThickness,1.0,3,
                 DEFAULT_BRANCH_ANGLE_BIAS,DEFAULT_BRANCH_DROOP,DEFAULT_APICAL_DOMINANCE);
     }
-    /** Tree height defaults to the height of the given size tier. */
+    /** Trunk height defaults to the height of the given size tier. */
     public TreeConfig(TreePreset preset, TreeScale scale, long seed,
                       double crookedness, double spread, double fullness,
                       CanopyShape canopyShape, double canopyScale, double attractionDensity,
@@ -138,7 +138,7 @@ public record TreeConfig(TreePreset preset, TreeScale scale, long seed,
     public TreeConfig withCrownBase(double value) {
         return new TreeConfig(preset,scale,seed,crookedness,spread,fullness,canopyShape,canopyScale,attractionDensity,pipeExponent,blockPalette,height,trunkThickness,crownStretch,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence,value);
     }
-    /** The crown position is measured from the placement point, as a fraction of configured height. */
+    /** The crown position is measured from the placement point, as a fraction of trunk height. */
     public double crownBaseHeight() { return height*crownBase; }
     public double crownVerticalScale() {
         return canopyShape==CanopyShape.SPHERE
@@ -148,5 +148,5 @@ public record TreeConfig(TreePreset preset, TreeScale scale, long seed,
     public double crownCenterHeight() {
         return crownBaseHeight() - canopyShape.crownMinY(crownLayers)*crownVerticalScale();
     }
-    public double initialTrunkHeight() { return Math.max(1,crownBaseHeight()); }
+    public int trunkSegments() { return (int)Math.ceil(height); }
 }

@@ -6,7 +6,7 @@ import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.network.chat.Component;
 import java.util.function.DoubleConsumer;
 
-/** Continuous tree-height slider. */
+/** Continuous trunk-height slider. */
 public final class ScaleSlider extends AbstractSliderButton {
     private static final double MIN=TreeConfig.MIN_HEIGHT, MAX=TreeConfig.MAX_HEIGHT;
     private final DoubleConsumer changed;

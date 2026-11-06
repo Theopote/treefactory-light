@@ -9,7 +9,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import org.jspecify.annotations.NonNull;
 
 public record C2SPreviewTreePacket(BlockPos origin, TreeConfig config) implements CustomPacketPayload {
-    public static final Type<C2SPreviewTreePacket> TYPE = new Type<>(TreefactoryLight.id("preview_tree_v2"));
+    public static final Type<C2SPreviewTreePacket> TYPE = new Type<>(TreefactoryLight.id("preview_tree_v3"));
     public static final StreamCodec<RegistryFriendlyByteBuf,C2SPreviewTreePacket> CODEC = CustomPacketPayload.codec(C2SPreviewTreePacket::write,C2SPreviewTreePacket::read);
     private void write(RegistryFriendlyByteBuf b) {
         b.writeBlockPos(origin); writeEnum(b,config.preset()); writeEnum(b,config.scale()); b.writeDouble(config.height()); b.writeLong(config.seed());

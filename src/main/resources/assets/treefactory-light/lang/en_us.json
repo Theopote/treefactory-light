@@ -35,7 +35,7 @@
   "treefactory.scale.medium": "Medium (M)",
   "treefactory.scale.large": "Large (L)",
   "treefactory.scale.giant": "Giant",
-  "treefactory.size": "Tree height: %s blocks",
+  "treefactory.size": "Trunk height: %s blocks",
   "treefactory.crookedness": "Crookedness %s%%",
   "treefactory.spread": "Spread %s%%",
   "treefactory.fullness": "Fullness %s%%",
@@ -46,7 +46,7 @@
   "treefactory.trunk_thickness": "Trunk thickness x%s",
   "treefactory.crown_stretch": "Crown stretch x%s",
   "treefactory.crown_offset": "Crown base %s%%",
-  "treefactory.crown_offset.tip": "Height of the crown shape's base above the placement point, as a percentage of configured tree height. Leaves and drooping branches may extend below it.",
+  "treefactory.crown_offset.tip": "Height of the crown shape's base above the placement point, as a percentage of trunk height. Leaves and drooping branches may extend below it.",
   "treefactory.crown_stretch.tip": "Stretches or squashes the crown vertically (not used by the sphere).",
   "treefactory.crown_layers": "Umbrella layers %s",
   "treefactory.crown_layers.tip": "Number of layers of the layered spindle crown (3-6).",
@@ -146,7 +146,7 @@
   "treefactory.gravity_influence.tip": "0% encourages upward growth, 50% is normal, and 100% makes branches curve downward.",
   "treefactory.save.tip": "Save the current settings as a preset under the name above.",
   "treefactory.secondary_weight.tip": "Share of leaves replaced by the secondary leaf block.",
-  "treefactory.size.tip": "Final tree height in blocks. Larger trees take longer to generate.",
+  "treefactory.size.tip": "Target trunk height in blocks. The crown may extend higher; see the preview for actual height.",
   "treefactory.spread.tip": "How widely branches fan out sideways.",
   "treefactory.undo.tip": "Remove the last placed tree (keeps the most recent 5)."
 }

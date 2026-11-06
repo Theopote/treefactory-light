@@ -21,8 +21,6 @@ public final class SpaceColonizer {
         double vertical = config.crownVerticalScale(), crownCenter = config.crownCenterHeight();
         double leanAngle = random.nextDouble()*Math.PI*2;
         double leanMag = height*.05*(.3+config.crookedness()*1.4);
-        double trunkHeight = config.initialTrunkHeight();
-        double trunkTop = Math.max(2,trunkHeight);
         double crownDX = Math.cos(leanAngle)*leanMag*1.5, crownDZ = Math.sin(leanAngle)*leanMag*1.5;
         List<Vector3> attractors = new ArrayList<>();
         int count = Math.min(1500,(int)((180 + 400 * config.fullness()) * config.attractionDensity()));
@@ -43,8 +41,10 @@ public final class SpaceColonizer {
         }
         List<TreeNode> nodes = new ArrayList<>();
         nodes.add(new TreeNode(new Vector3(.5,.5,.5), -1, .5));
-        for (int y = 1; y <= trunkHeight; y++) {
-            double t = Math.min(1,y/trunkTop), ease = t*t;
+        int trunkSegments = config.trunkSegments();
+        for (int i = 1; i <= trunkSegments; i++) {
+            double y = Math.min(i,height);
+            double t = y/height, ease = t*t;
             double wob = (.25+config.crookedness()*.9);
             double bx = Math.cos(leanAngle)*leanMag*ease + wob*noise.sample(y*.19+11.3,5.1,2.2);
             double bz = Math.sin(leanAngle)*leanMag*ease + wob*noise.sample(y*.19+3.7,9.4,6.6);
@@ -58,8 +58,10 @@ public final class SpaceColonizer {
             Vector3[] sum = new Vector3[nodes.size()];
             // Spatial buckets avoid a full attractor × node scan for large trees.
             Map<Cell, List<Integer>> buckets = new HashMap<>();
-            for (int i = 0; i < nodes.size(); i++)
+            for (int i = 0; i < nodes.size(); i++) {
+                if (i <= trunkSegments && nodes.get(i).position().y() - .5 < config.crownBaseHeight()) continue;
                 buckets.computeIfAbsent(bucket(nodes.get(i).position(), influence), k -> new ArrayList<>()).add(i);
+            }
             Iterator<Vector3> iterator = attractors.iterator();
             while (iterator.hasNext()) {
                 Vector3 point = iterator.next(); Cell b = bucket(point, influence);
@@ -127,7 +129,7 @@ public final class SpaceColonizer {
     /** Mangrove-like presets: diagonal stilt roots from the lower trunk. */
     private static void addPropRoots(List<TreeNode> nodes, Set<Cell> occupied, TreeConfig config, Random random,
                                      BooleanSupplier cancelled) {
-        int maxTrunk = Math.min(1 + (int)config.initialTrunkHeight(), (int)(config.height() * 0.15) + 2);
+        int maxTrunk = Math.min(1 + config.trunkSegments(), (int)(config.height() * 0.15) + 2);
         if (maxTrunk < 2) return;
         int roots = 4 + random.nextInt(3);
         for (int r = 0; r < roots && nodes.size() < MAX_NODES; r++) {

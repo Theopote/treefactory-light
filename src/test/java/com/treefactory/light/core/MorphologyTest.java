@@ -41,7 +41,7 @@ class MorphologyTest {
         SpaceColonizer colonizer = new SpaceColonizer();
         for (String id : List.of("builtin-oak", "builtin-birch", "builtin-cherry", "builtin-cypress")) {
             TreeConfig config = preset(id);
-            int start = 1 + (int)(config.height() * .36);
+            int start = 1 + config.trunkSegments();
             BranchDirections upward = branchDirections(colonizer.generate(config.withGravityInfluence(0)), start);
             BranchDirections normal = branchDirections(colonizer.generate(config.withGravityInfluence(.5)), start);
             BranchDirections drooping = branchDirections(colonizer.generate(config.withGravityInfluence(1)), start);
@@ -89,7 +89,7 @@ class MorphologyTest {
             dy += delta;
             if (delta < 0) {
                 down++;
-                if (parent.parent() >= start && parent.position().y() > nodes.get(parent.parent()).position().y()) bends++;
+                if (parent.parent() >= 0 && parent.position().y() > nodes.get(parent.parent()).position().y()) bends++;
             }
         }
         return new BranchDirections(dy / (nodes.size() - start), (double) down / (nodes.size() - start), bends);

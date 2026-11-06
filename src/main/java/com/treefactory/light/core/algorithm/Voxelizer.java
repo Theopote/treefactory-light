@@ -55,8 +55,9 @@ public final class Voxelizer {
     public VoxelData voxelizeData(List<TreeNode> nodes, TreeConfig config, BooleanSupplier cancelled) {
         VoxelAccumulator acc = new VoxelAccumulator();
         boolean[] parents = new boolean[nodes.size()];
-        for (TreeNode node : nodes) {
+        for (int i=0; i<nodes.size(); i++) {
             check(cancelled);
+            TreeNode node=nodes.get(i);
             if (node.parent()<0) continue;
             parents[node.parent()] = true;
             TreeNode parent = nodes.get(node.parent());
@@ -68,9 +69,7 @@ public final class Voxelizer {
                         Material.PRIMARY_LEAF,Axis.Y,cancelled,config.seed(),config.blockPalette());
                 continue;
             }
-            double cap=Math.max(1.0,config.height()*.055);
-            double lateral=Math.hypot(parent.position().x()-.5,parent.position().z()-.5);
-            Material wood=parent.position().y()<config.initialTrunkHeight()+1 && lateral<=cap+.8
+            Material wood=i<=config.trunkSegments() && node.parent()==i-1
                     ? Material.MAIN_TRUNK : radius>=.7 ? Material.THICK_BRANCH : Material.THIN_BRANCH;
             Axis axis=axis(parent.position(),node.position());
             fill(acc,parent.position(),node.position(),parent.radius(),node.radius(),wood,axis,cancelled,config.seed(),config.blockPalette());

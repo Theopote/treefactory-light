@@ -35,7 +35,7 @@
   "treefactory.scale.medium": "中型 M",
   "treefactory.scale.large": "大型 L",
   "treefactory.scale.giant": "巨型 Giant",
-  "treefactory.size": "树木高度：%s 格",
+  "treefactory.size": "树干高度：%s 格",
   "treefactory.crookedness": "曲折度 %s%%",
   "treefactory.spread": "展开度 %s%%",
   "treefactory.fullness": "丰满度 %s%%",
@@ -46,7 +46,7 @@
   "treefactory.trunk_thickness": "树干粗细 ×%s",
   "treefactory.crown_stretch": "树冠纵向拉伸 ×%s",
   "treefactory.crown_offset": "树冠底部 %s%%",
-  "treefactory.crown_offset.tip": "树冠主体底部距放置点的高度，占设定树高的比例；叶片和下垂枝条可能超出底部。",
+  "treefactory.crown_offset.tip": "树冠主体底部距放置点的高度，占树干高度的比例；叶片和下垂枝条可能超出底部。",
   "treefactory.crown_stretch.tip": "在垂直方向拉伸或压缩树冠形状（球形不适用）。",
   "treefactory.crown_layers": "伞层数 %s",
   "treefactory.crown_layers.tip": "梭形叠伞树冠的层数（3～6）。",
@@ -146,7 +146,7 @@
   "treefactory.gravity_influence.tip": "0% 枝条明显向上，50% 为常规生长，100% 则更容易弯曲下垂。",
   "treefactory.save.tip": "以上方名称保存当前设置为预设。",
   "treefactory.secondary_weight.tip": "被点缀叶方块替换的树叶比例。",
-  "treefactory.size.tip": "树的最终高度（方块数）。越高生成越慢。",
+  "treefactory.size.tip": "树干的目标高度（方块数）。树冠可能超出树干，最终高度见预览。",
   "treefactory.spread.tip": "枝条向两侧展开的幅度。",
   "treefactory.undo.tip": "撤销最近放置的树（保留最近 5 次）。"
 }
