@@ -13,7 +13,7 @@ public record TreeConfig(TreePreset preset, TreeScale scale, long seed,
     public static final double MIN_HEIGHT=6, MAX_HEIGHT=48, MIN_THICKNESS=.5, MAX_THICKNESS=2.0, MIN_STRETCH=.6, MAX_STRETCH=2.0;
     public static final int MIN_LAYERS=3, MAX_LAYERS=6;
     public static final double DEFAULT_BRANCH_ANGLE_BIAS=.5, DEFAULT_BRANCH_DROOP=0, DEFAULT_APICAL_DOMINANCE=.5,
-            DEFAULT_GRAVITY_INFLUENCE=0;
+            DEFAULT_GRAVITY_INFLUENCE=.5;
     public TreeConfig {
         Objects.requireNonNull(preset);
         Objects.requireNonNull(scale);

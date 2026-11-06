@@ -12,10 +12,11 @@ public final class BranchMorphology {
     public static GrowthBias growthBias(TreeConfig config) {
         boolean willow = config.preset() == TreePreset.WILLOW;
         double yBias = 0.14 + 0.28 * (TreeConfig.DEFAULT_BRANCH_ANGLE_BIAS - config.branchAngleBias())
-                - config.branchDroop() * 0.35 - config.gravityInfluence() * 0.8;
+                - config.branchDroop() * 0.35 - (config.gravityInfluence() - 0.5) * 2.4;
         if (willow) yBias -= 0.05;
         double inertia = 0.6 + config.apicalDominance() * 0.8;
-        boolean allowDown = willow || config.branchDroop() > 0.4 || config.gravityInfluence() > 0.4;
+        // Keep the 1.2 downward-growth threshold when older gravity values are converted.
+        boolean allowDown = willow || config.branchDroop() > 0.4 || config.gravityInfluence() > (0.5 + 0.4 / 3.0);
         return new GrowthBias(yBias, inertia, allowDown);
     }
 

@@ -1,6 +1,7 @@
 package com.treefactory.light.core;
 
 import com.treefactory.light.core.config.*;
+import com.treefactory.light.core.algorithm.BranchMorphology;
 import java.nio.file.*;
 import java.nio.file.attribute.FileTime;
 import java.util.*;
@@ -20,7 +21,7 @@ class PresetStoreTest {
     }
     @Test void unknownVersionsAndNonFiniteNumbersAreRejected() {
         String json=PresetStore.encode("Oak","Player",TreeConfig.defaults());
-        assertThrows(IllegalArgumentException.class,()->PresetStore.decode("id",json.replace("\"1.2\"","\"2.0\"")));
+        assertThrows(IllegalArgumentException.class,()->PresetStore.decode("id",json.replace("\"1.3\"","\"2.0\"")));
         assertThrows(IllegalArgumentException.class,()->PresetStore.decode("id",json.replace("0.35","1e999")));
     }
     @Test void versionOnePresetsGainDefaultGeometryAndPalette() {
@@ -40,6 +41,18 @@ class PresetStoreTest {
         root.getAsJsonObject("morphology").remove("gravity_influence");
         var loaded=PresetStore.decode("legacy",root.toString()).config();
         assertEquals(TreeConfig.DEFAULT_GRAVITY_INFLUENCE,loaded.gravityInfluence());
+    }
+    @Test void versionOnePointTwoGravityPreservesOriginalGrowthBias() {
+        for (double oldGravity : new double[] {0, .2, .4, .41, .7, 1}) {
+            var root=com.google.gson.JsonParser.parseString(PresetStore.encode("Oak","Player",TreeConfig.defaults())).getAsJsonObject();
+            root.addProperty("version","1.2");
+            root.getAsJsonObject("morphology").addProperty("gravity_influence",oldGravity);
+            TreeConfig loaded=PresetStore.decode("legacy",root.toString()).config();
+            var bias=BranchMorphology.growthBias(loaded);
+            assertEquals(.14 - oldGravity * .8,bias.yBias(),1e-12);
+            assertEquals(oldGravity > .4,bias.allowDownward());
+            assertEquals(loaded,PresetStore.decode("new",PresetStore.encode("Oak","Player",loaded)).config());
+        }
     }
     @Test void recentlyModifiedPresetsAppearFirst() throws Exception {
         PresetStore store=new PresetStore(directory);

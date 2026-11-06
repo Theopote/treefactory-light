@@ -19,16 +19,37 @@ class MorphologyTest {
     @Test void gravityInfluenceMakesBranchesLessUpwardAndAllowsDrooping() {
         TreeConfig config = TreeConfig.defaults();
         var noGravity = BranchMorphology.growthBias(config.withGravityInfluence(0));
+        var normalGravity = BranchMorphology.growthBias(config.withGravityInfluence(.5));
         var fullGravity = BranchMorphology.growthBias(config.withGravityInfluence(1));
-        assertTrue(noGravity.yBias() > fullGravity.yBias());
+        assertTrue(noGravity.yBias() > normalGravity.yBias());
+        assertTrue(normalGravity.yBias() > fullGravity.yBias());
         assertFalse(noGravity.allowDownward());
+        assertFalse(normalGravity.allowDownward());
         assertTrue(fullGravity.allowDownward());
+        assertThrows(IllegalArgumentException.class, () -> config.withGravityInfluence(-.01));
+        assertThrows(IllegalArgumentException.class, () -> config.withGravityInfluence(1.01));
+        assertThrows(IllegalArgumentException.class, () -> config.withGravityInfluence(Double.NaN));
     }
 
     @Test void defaultMorphologyKeepsDeterministicSkeleton() {
         TreeConfig config = TreeConfig.defaults();
         var colonizer = new SpaceColonizer();
         assertEquals(colonizer.generate(config), colonizer.generate(config));
+    }
+
+    @Test void gravityChangesActualBranchDirections() {
+        SpaceColonizer colonizer = new SpaceColonizer();
+        for (String id : List.of("builtin-oak", "builtin-birch", "builtin-cherry", "builtin-cypress")) {
+            TreeConfig config = preset(id);
+            int start = 1 + (int)(config.height() * .36);
+            BranchDirections upward = branchDirections(colonizer.generate(config.withGravityInfluence(0)), start);
+            BranchDirections normal = branchDirections(colonizer.generate(config.withGravityInfluence(.5)), start);
+            BranchDirections drooping = branchDirections(colonizer.generate(config.withGravityInfluence(1)), start);
+            assertTrue(upward.meanY() > normal.meanY() + .15, id);
+            assertTrue(drooping.meanY() < normal.meanY() - .3, id);
+            assertTrue(drooping.downwardFraction() > .3, id);
+            assertTrue(drooping.downwardBends() >= 5, id);
+        }
     }
 
     @Test void builtInPresetsExpressDistinctBranchStrategies() {
@@ -54,6 +75,24 @@ class MorphologyTest {
 
     private static TreeConfig preset(String id) {
         return BuiltInPresets.all().stream().filter(p -> p.id().equals(id)).findFirst().orElseThrow().config();
+    }
+
+    private record BranchDirections(double meanY, double downwardFraction, int downwardBends) {}
+
+    private static BranchDirections branchDirections(List<TreeNode> nodes, int start) {
+        assertTrue(nodes.size() > start);
+        double dy = 0;
+        int down = 0, bends = 0;
+        for (int i = start; i < nodes.size(); i++) {
+            TreeNode node = nodes.get(i), parent = nodes.get(node.parent());
+            double delta = node.position().y() - parent.position().y();
+            dy += delta;
+            if (delta < 0) {
+                down++;
+                if (parent.parent() >= start && parent.position().y() > nodes.get(parent.parent()).position().y()) bends++;
+            }
+        }
+        return new BranchDirections(dy / (nodes.size() - start), (double) down / (nodes.size() - start), bends);
     }
 
     private static double averageLateralRatio(List<TreeNode> nodes) {

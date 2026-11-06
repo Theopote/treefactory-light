@@ -58,7 +58,7 @@ public final class PresetStore {
     }
     public static String encode(String name, String author, TreeConfig c) {
         JsonObject root = new JsonObject();
-        root.addProperty("name",name); root.addProperty("author",author); root.addProperty("version","1.2");
+        root.addProperty("name",name); root.addProperty("author",author); root.addProperty("version","1.3");
         root.addProperty("preset_type",c.preset().id()); root.addProperty("scale",c.scale().id()); root.addProperty("height",c.height()); root.addProperty("seed",c.seed());
         JsonObject dna = new JsonObject();
         dna.addProperty("crookedness",c.crookedness()); dna.addProperty("spread",c.spread()); dna.addProperty("fullness",c.fullness());
@@ -87,7 +87,7 @@ public final class PresetStore {
         if (json.length()>16384) throw new IllegalArgumentException("Preset too large");
         JsonObject root = JsonParser.parseString(json).getAsJsonObject();
         String version=root.get("version").getAsString();
-        if (!"1.0".equals(version) && !"1.1".equals(version) && !"1.2".equals(version)) throw new IllegalArgumentException("Unsupported preset version");
+        if (!"1.0".equals(version) && !"1.1".equals(version) && !"1.2".equals(version) && !"1.3".equals(version)) throw new IllegalArgumentException("Unsupported preset version");
         String name = root.get("name").getAsString(), author = root.get("author").getAsString();
         if (name.isBlank() || name.length()>64 || author.length()>64) throw new IllegalArgumentException("Invalid preset metadata");
         JsonObject dna = root.getAsJsonObject("dna"), palette = root.getAsJsonObject("palette");
@@ -108,6 +108,11 @@ public final class PresetStore {
         double droop=morphology!=null && morphology.has("branch_droop")?morphology.get("branch_droop").getAsDouble():TreeConfig.DEFAULT_BRANCH_DROOP;
         double apical=morphology!=null && morphology.has("apical_dominance")?morphology.get("apical_dominance").getAsDouble():TreeConfig.DEFAULT_APICAL_DOMINANCE;
         double gravity=morphology!=null && morphology.has("gravity_influence")?morphology.get("gravity_influence").getAsDouble():TreeConfig.DEFAULT_GRAVITY_INFLUENCE;
+        if ("1.2".equals(version) && morphology!=null && morphology.has("gravity_influence")) {
+            if (!Double.isFinite(gravity) || gravity < 0 || gravity > 1) throw new IllegalArgumentException("Invalid gravity influence");
+            // The old slider applied -0.8 * gravity; preserve that bias on the new centered scale.
+            gravity=0.5+gravity/3.0;
+        }
         TreeConfig config=new TreeConfig(type,legacy.scale(),legacy.seed(),legacy.crookedness(),legacy.spread(),legacy.fullness(),
                 CanopyShape.valueOf(canopy.get("shape").getAsString().toUpperCase(Locale.ROOT)),canopy.get("scale").getAsDouble(),
                 canopy.get("density").getAsDouble(),canopy.get("pipe_exponent").getAsDouble(),blocks,height,
