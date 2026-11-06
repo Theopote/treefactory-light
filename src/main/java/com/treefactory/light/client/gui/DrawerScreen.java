@@ -173,6 +173,9 @@ public final class DrawerScreen extends Screen {
         addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.pipe_exponent", (c.pipeExponent() - 2.5) / .5,
                 v -> state.update(state.config().withPipeExponent(2.5 + .5 * v))));
         y += 22;
+        addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.gravity_influence", c.gravityInfluence(),
+                v -> state.update(state.config().withGravityInfluence(v))));
+        y += 22;
 
         Button materialsBtn = button(M, y - scroll, w, "treefactory.choose_materials", () -> {
             materialsOpen = !materialsOpen;

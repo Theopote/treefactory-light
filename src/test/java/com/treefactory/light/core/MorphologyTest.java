@@ -16,6 +16,15 @@ class MorphologyTest {
         assertFalse(bias.allowDownward());
     }
 
+    @Test void gravityInfluenceMakesBranchesLessUpwardAndAllowsDrooping() {
+        TreeConfig config = TreeConfig.defaults();
+        var noGravity = BranchMorphology.growthBias(config.withGravityInfluence(0));
+        var fullGravity = BranchMorphology.growthBias(config.withGravityInfluence(1));
+        assertTrue(noGravity.yBias() > fullGravity.yBias());
+        assertFalse(noGravity.allowDownward());
+        assertTrue(fullGravity.allowDownward());
+    }
+
     @Test void defaultMorphologyKeepsDeterministicSkeleton() {
         TreeConfig config = TreeConfig.defaults();
         var colonizer = new SpaceColonizer();
@@ -35,11 +44,12 @@ class MorphologyTest {
     }
 
     @Test void morphologyRoundTripsThroughPresetStore() {
-        TreeConfig config = TreeConfig.defaults().withMorphology(0.82, 0.71, 0.29);
+        TreeConfig config = TreeConfig.defaults().withMorphology(0.82, 0.71, 0.29).withGravityInfluence(0.64);
         var decoded = PresetStore.decode("id", PresetStore.encode("Morph", "Tester", config)).config();
         assertEquals(config.branchAngleBias(), decoded.branchAngleBias());
         assertEquals(config.branchDroop(), decoded.branchDroop());
         assertEquals(config.apicalDominance(), decoded.apicalDominance());
+        assertEquals(config.gravityInfluence(), decoded.gravityInfluence());
     }
 
     private static TreeConfig preset(String id) {

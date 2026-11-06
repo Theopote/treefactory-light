@@ -20,7 +20,7 @@ class PresetStoreTest {
     }
     @Test void unknownVersionsAndNonFiniteNumbersAreRejected() {
         String json=PresetStore.encode("Oak","Player",TreeConfig.defaults());
-        assertThrows(IllegalArgumentException.class,()->PresetStore.decode("id",json.replace("\"1.1\"","\"2.0\"")));
+        assertThrows(IllegalArgumentException.class,()->PresetStore.decode("id",json.replace("\"1.2\"","\"2.0\"")));
         assertThrows(IllegalArgumentException.class,()->PresetStore.decode("id",json.replace("0.35","1e999")));
     }
     @Test void versionOnePresetsGainDefaultGeometryAndPalette() {
@@ -32,6 +32,14 @@ class PresetStoreTest {
                 "primary_weight","secondary_weight","accent_weight")) palette.remove(key);
         var loaded=PresetStore.decode("legacy",root.toString()).config();
         assertEquals(TreeConfig.defaults(),loaded);
+    }
+    @Test void versionOnePointOnePresetsGainDefaultGravityInfluence() {
+        String current=PresetStore.encode("Oak","Player",TreeConfig.defaults().withGravityInfluence(.8));
+        var root=com.google.gson.JsonParser.parseString(current).getAsJsonObject();
+        root.addProperty("version","1.1");
+        root.getAsJsonObject("morphology").remove("gravity_influence");
+        var loaded=PresetStore.decode("legacy",root.toString()).config();
+        assertEquals(TreeConfig.DEFAULT_GRAVITY_INFLUENCE,loaded.gravityInfluence());
     }
     @Test void recentlyModifiedPresetsAppearFirst() throws Exception {
         PresetStore store=new PresetStore(directory);
