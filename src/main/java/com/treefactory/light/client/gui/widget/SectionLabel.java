@@ -14,7 +14,7 @@ public final class SectionLabel extends AbstractWidget {
 
     @Override
     protected void extractWidgetRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {
-        g.text(Minecraft.getInstance().font, getMessage(), getX(), getY() + 3, 0xFF83B99D);
+        g.text(Minecraft.getInstance().font, getMessage(), getX(), getY() + 3, 0xFFFFFFFF);
     }
 
     @Override

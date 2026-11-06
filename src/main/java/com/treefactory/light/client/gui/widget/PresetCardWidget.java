@@ -24,7 +24,7 @@ public final class PresetCardWidget extends Button {
         var state=ClientTreeState.INSTANCE;
         boolean selected=state.config().equals(preset.config());
         graphics.fill(getX(),getY(),getX()+width,getY()+height,isHovered()?0xFF234A40:0xFF182D27);
-        graphics.outline(getX(),getY(),width,height,selected?0xFF69DFB1:0xFF37584D);
+        graphics.outline(getX(),getY(),width,height,selected?0xFFFFFFFF:0xFF606060);
         var texture=ThumbnailFBOMaker.texture(preset.id(),state.store.thumbnail(preset.id()));
         var preview=state.preview();
         ThumbnailFBOMaker.ensure(preset,selected?preview:null,state.store.thumbnail(preset.id()));

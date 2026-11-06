@@ -62,7 +62,7 @@ final class MaterialPanel {
         @Override
         protected void extractContents(GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {
             g.fill(getX(), getY(), getX() + width, getY() + height, isHovered() ? 0xFF234A40 : 0xFF14261F);
-            g.outline(getX(), getY(), width, height, tabRole == role ? 0xFF69DFB1 : 0xFF37584D);
+            g.outline(getX(), getY(), width, height, tabRole == role ? 0xFFFFFFFF : 0xFF606060);
             block(idOf(tabRole, state.config().blockPalette()))
                     .ifPresent(b -> g.item(new ItemStack(b), getX() + (width - 16) / 2, getY() + (height - 16) / 2));
         }
@@ -193,18 +193,18 @@ final class MaterialPanel {
 
     void render(GuiGraphicsExtractor g, Font font, int mouseX, int mouseY) {
         g.fill(x, 0, x + width, height, 0xF00B1814);
-        g.fill(x + width - 1, 0, x + width, height, 0xFF4C876C);
+        g.fill(x + width - 1, 0, x + width, height, 0xFF808080);
         g.fill(x, 0, x + width - 1, 16, 0xFF3C3F3E);
-        g.text(font, Component.translatable("treefactory.materials.title"), x + 6, 4, 0xFFB8F8D2);
+        g.text(font, Component.translatable("treefactory.materials.title"), x + 6, 4, 0xFFFFFFFF);
 
         Component roleName = Component.translatable(ROLE_KEYS[role.ordinal()]);
-        g.text(font, roleName, x + 8, 22 + TAB_SIZE + 2, 0xFFE2F5E9);
+        g.text(font, roleName, x + 8, 22 + TAB_SIZE + 2, 0xFFFFFFFF);
 
         var palette = state.config().blockPalette();
         double primary = Math.max(0, 1 - palette.secondaryWeight() - palette.accentWeight());
         Component mix = Component.translatable("treefactory.leaf_mix",
                 Math.round(primary * 100), Math.round(palette.secondaryWeight() * 100), Math.round(palette.accentWeight() * 100));
-        g.text(font, font.plainSubstrByWidth(mix.getString(), width - 16), x + 8, height - 68, 0xFF9CE7BD);
+        g.text(font, font.plainSubstrByWidth(mix.getString(), width - 16), x + 8, height - 68, 0xFFFFFFFF);
 
         List<Block> blocks = visible();
         scroll = Math.clamp(scroll, 0, maxScroll(blocks.size()));
@@ -221,15 +221,15 @@ final class MaterialPanel {
             if (over) hovered = b;
             boolean selected = PaletteRules.id(b).equals(current);
             g.fill(cx, cy, cx + cell - 1, cy + cell - 1, over ? 0xFF234A40 : 0xFF14261F);
-            if (selected) g.outline(cx, cy, cell - 1, cell - 1, 0xFF69DFB1);
+            if (selected) g.outline(cx, cy, cell - 1, cell - 1, 0xFFFFFFFF);
             g.item(new ItemStack(b), cx + iconInset, cy + iconInset);
         }
         g.disableScissor();
-        if (blocks.isEmpty()) g.text(font, Component.translatable("treefactory.materials.none"), x + 8, gridTop + 4, 0xFFB0C9BC);
+        if (blocks.isEmpty()) g.text(font, Component.translatable("treefactory.materials.none"), x + 8, gridTop + 4, 0xFFFFFFFF);
         Block shown = hovered != null ? hovered : block(current).orElse(null);
         if (shown != null) {
             String line = shown.getName().getString();
-            g.text(font, font.plainSubstrByWidth(line, width - 16), x + 8, height - 58, 0xFF9CE7BD);
+            g.text(font, font.plainSubstrByWidth(line, width - 16), x + 8, height - 58, 0xFFFFFFFF);
         }
     }
 

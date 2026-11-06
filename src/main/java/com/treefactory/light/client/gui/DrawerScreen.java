@@ -181,7 +181,7 @@ public final class DrawerScreen extends Screen {
             materialsOpen = !materialsOpen;
             refresh();
         });
-        materialsBtn.setMessage(Component.translatable("treefactory.choose_materials").append(materialsOpen ? " ▶" : " ▼"));
+        materialsBtn.setMessage(Component.translatable("treefactory.choose_materials").append(materialsOpen ? " ▶" : " ◀"));
         addContent(materialsBtn);
         y += 24;
         int saveHalf = (w - 2) / 2;
@@ -272,14 +272,14 @@ public final class DrawerScreen extends Screen {
     @Override
     public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {
         g.fill(0, 0, panel, height, 0xF010201B);
-        g.fill(panel - 1, 0, panel, height, 0xFF4C876C);
+        g.fill(panel - 1, 0, panel, height, 0xFF808080);
         g.fill(0, 0, panel - 1, TITLE_H, 0xFF3C3F3E);
-        g.text(font, font.plainSubstrByWidth("Treefactory Light", panel - 2 * M), M, 4, 0xFFB8F8D2);
+        g.text(font, font.plainSubstrByWidth("Treefactory Light", panel - 2 * M), M, 4, 0xFFFFFFFF);
 
         g.enableScissor(0, TOP, panel, bottom());
         for (AbstractWidget widget : content) widget.extractRenderState(g, mouseX, mouseY, delta);
         if (library && state.presets().isEmpty()) {
-            g.textWithWordWrap(font, Component.translatable("treefactory.empty_library"), M, TOP + 4, panel - 2 * M, 0xFFB0C9BC);
+            g.textWithWordWrap(font, Component.translatable("treefactory.empty_library"), M, TOP + 4, panel - 2 * M, 0xFFFFFFFF);
         }
         g.disableScissor();
 
@@ -289,7 +289,7 @@ public final class DrawerScreen extends Screen {
             int tx = Math.min(mouseX + 8, panel - tipW - 4);
             int ty = Math.max(TOP + 2, mouseY - 14);
             g.fill(tx - 2, ty - 2, tx + tipW + 2, ty + 10, 0xE010201B);
-            g.text(font, tip, tx, ty, 0xFFE2F5E9);
+            g.text(font, tip, tx, ty, 0xFFFFFFFF);
         }
 
         for (AbstractWidget widget : fixed) widget.extractRenderState(g, mouseX, mouseY, delta);
@@ -297,8 +297,8 @@ public final class DrawerScreen extends Screen {
         if (contentHeight > viewport()) {
             int track = Math.max(1, viewport()), thumb = Math.max(12, track * track / contentHeight);
             int y = TOP + (int) ((track - thumb) * scroll / (double) Math.max(1, contentHeight - track));
-            g.fill(panel - 4, TOP, panel - 2, bottom(), 0xFF274237);
-            g.fill(panel - 4, y, panel - 2, y + thumb, 0xFF83B99D);
+            g.fill(panel - 4, TOP, panel - 2, bottom(), 0xFF303030);
+            g.fill(panel - 4, y, panel - 2, y + thumb, 0xFFB0B0B0);
         }
 
         if (materialsOpen && !library) {
@@ -309,19 +309,19 @@ public final class DrawerScreen extends Screen {
         if (menuPreset != null) {
             boolean over = mouseX >= menuX && mouseX < menuX + MENU_W && mouseY >= menuY && mouseY < menuY + MENU_H;
             g.fill(menuX, menuY, menuX + MENU_W, menuY + MENU_H, over ? 0xFF5A2A2A : 0xFF2A1F1F);
-            g.outline(menuX, menuY, MENU_W, MENU_H, 0xFFB86A6A);
+            g.outline(menuX, menuY, MENU_W, MENU_H, 0xFF808080);
             Component label = Component.translatable("treefactory.delete");
-            g.text(font, label, menuX + (MENU_W - font.width(label)) / 2, menuY + 5, 0xFFFFD0D0);
+            g.text(font, label, menuX + (MENU_W - font.width(label)) / 2, menuY + 5, 0xFFFFFFFF);
         }
 
         int statusLeft = (materialsOpen && !library ? materialLeft + materialWidth : panel) + 10;
         int statusRight = width - 10;
         Component info = Component.literal(state.status());
         String clipped = font.plainSubstrByWidth(info.getString(), Math.max(40, statusRight - statusLeft));
-        g.text(font, clipped, statusRight - font.width(clipped), height - 14, 0xFF9CE7BD);
+        g.text(font, clipped, statusRight - font.width(clipped), height - 14, 0xFFFFFFFF);
 
         Component hint = Component.translatable("treefactory.preview_hint");
-        g.text(font, font.plainSubstrByWidth(hint.getString(), width - statusLeft - 20), statusLeft, 6, 0xFFE2F5E9);
+        g.text(font, font.plainSubstrByWidth(hint.getString(), width - statusLeft - 20), statusLeft, 6, 0xFFFFFFFF);
 
     }
 

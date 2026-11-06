@@ -40,7 +40,7 @@ public final class ShapeIcons {
     /** Enlarged preview with a frame, used while hovering or choosing a shape. */
     public static void drawFramed(GuiGraphicsExtractor g,CanopyShape shape,int x,int y,int size) {
         g.fill(x-3,y-3,x+size+3,y+size+3,0xE00B1814);
-        g.outline(x-3,y-3,size+6,size+6,0xFF4C876C);
+        g.outline(x-3,y-3,size+6,size+6,0xFF808080);
         draw(g,shape,x,y,size,0xFF83B99D);
     }
 }

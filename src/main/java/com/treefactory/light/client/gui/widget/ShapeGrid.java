@@ -56,7 +56,7 @@ public final class ShapeGrid extends AbstractWidget {
             boolean over = shape == hovered;
             boolean pick = shape == selected;
             g.fill(cx, cy, cx + CELL - 1, cy + CELL - 1, over ? 0xFF234A40 : 0xFF14261F);
-            g.outline(cx, cy, CELL - 1, CELL - 1, pick ? 0xFF69DFB1 : 0xFF37584D);
+            g.outline(cx, cy, CELL - 1, CELL - 1, pick ? 0xFFFFFFFF : 0xFF606060);
             ShapeIcons.draw(g, shape, cx + 7, cy + 7, 14, pick ? 0xFFB8F8D2 : 0xFF9CB8A9);
         }
     }
