@@ -148,9 +148,9 @@ public final class DrawerScreen extends Screen {
                 }));
         y += 22;
         addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.crown_offset",
-                (c.crownOffset() - TreeConfig.MIN_CROWN_OFFSET) / (TreeConfig.MAX_CROWN_OFFSET - TreeConfig.MIN_CROWN_OFFSET),
-                v -> state.update(state.config().withCrownOffset(TreeConfig.MIN_CROWN_OFFSET
-                        + (TreeConfig.MAX_CROWN_OFFSET - TreeConfig.MIN_CROWN_OFFSET) * v))));
+                (c.crownBase() - TreeConfig.MIN_CROWN_BASE) / (TreeConfig.MAX_CROWN_BASE - TreeConfig.MIN_CROWN_BASE),
+                v -> state.update(state.config().withCrownBase(TreeConfig.MIN_CROWN_BASE
+                        + (TreeConfig.MAX_CROWN_BASE - TreeConfig.MIN_CROWN_BASE) * v))));
         y += 22;
         addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.spread", c.spread(),
                 v -> state.update(state.config().withDna(state.config().crookedness(), v, state.config().fullness()))));

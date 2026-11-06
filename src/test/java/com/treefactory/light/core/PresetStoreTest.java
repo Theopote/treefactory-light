@@ -21,7 +21,7 @@ class PresetStoreTest {
     }
     @Test void unknownVersionsAndNonFiniteNumbersAreRejected() {
         String json=PresetStore.encode("Oak","Player",TreeConfig.defaults());
-        assertThrows(IllegalArgumentException.class,()->PresetStore.decode("id",json.replace("\"1.4\"","\"2.0\"")));
+        assertThrows(IllegalArgumentException.class,()->PresetStore.decode("id",json.replace("\"1.5\"","\"2.0\"")));
         assertThrows(IllegalArgumentException.class,()->PresetStore.decode("id",json.replace("0.35","1e999")));
     }
     @Test void versionOnePresetsGainDefaultGeometryAndPalette() {
@@ -32,7 +32,7 @@ class PresetStoreTest {
         for(String key:List.of("thick_branch","thin_branch","secondary_leaf","accent_block",
                 "primary_weight","secondary_weight","accent_weight")) palette.remove(key);
         var loaded=PresetStore.decode("legacy",root.toString()).config();
-        assertEquals(TreeConfig.defaults(),loaded);
+        assertEquals(TreeConfig.defaults().withCrownBase(.76-.38*1.25),loaded);
     }
     @Test void versionOnePointOnePresetsGainDefaultGravityInfluence() {
         String current=PresetStore.encode("Oak","Player",TreeConfig.defaults().withGravityInfluence(.8));

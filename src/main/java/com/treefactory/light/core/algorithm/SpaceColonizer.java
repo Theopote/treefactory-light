@@ -18,17 +18,10 @@ public final class SpaceColonizer {
         NoiseGenerator noise = new NoiseGenerator(config.seed());
         double height = config.height();
         double width = height * (.22 + .38 * config.spread()) * config.canopyScale();
-        double halfHeight = height * .38 * config.canopyScale() * config.crownStretch();
-        double crownCenter = config.canopyShape()==CanopyShape.SPHERE ? Math.max(height*.76,width+2) : height*.76;
-        // Stretch grows the crown upward only: the lowest point of the shape stays where it is at stretch 1.
-        if (config.canopyShape()!=CanopyShape.SPHERE) {
-            double baseY=config.canopyShape().minY(config.crownLayers());
-            crownCenter -= baseY*height*.38*config.canopyScale()*(config.crownStretch()-1);
-        }
+        double vertical = config.crownVerticalScale(), crownCenter = config.crownCenterHeight();
         double leanAngle = random.nextDouble()*Math.PI*2;
         double leanMag = height*.05*(.3+config.crookedness()*1.4);
         double trunkHeight = config.initialTrunkHeight();
-        crownCenter += trunkHeight - height*.36;
         double trunkTop = Math.max(2,trunkHeight);
         double crownDX = Math.cos(leanAngle)*leanMag*1.5, crownDZ = Math.sin(leanAngle)*leanMag*1.5;
         List<Vector3> attractors = new ArrayList<>();
@@ -45,7 +38,6 @@ public final class SpaceColonizer {
                     || noise.sample(x*1.9+4.3,y*1.9+1.1,z*1.9+8.7)>.22));
             // A shape that cannot accept samples must not retry this point forever.
             if(attempts==256) continue;
-            double vertical = config.canopyShape()==CanopyShape.SPHERE ? width : halfHeight;
             Vector3 point = new Vector3(.5+crownDX+x*width,crownCenter+y*vertical,.5+crownDZ+z*width);
             attractors.add(point);
         }

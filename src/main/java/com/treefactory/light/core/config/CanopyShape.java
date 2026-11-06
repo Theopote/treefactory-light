@@ -94,6 +94,14 @@ public enum CanopyShape implements ICanopyShape {
             default -> -1;
         };
     }
+    /** Minimum height of the unperturbed crown shape, including off-axis edges. */
+    public double crownMinY(int layers) {
+        return switch (this) {
+            case TRUNCATED_CONE -> -.78;
+            case OBLATE_ELLIPSOID -> -.58;
+            default -> minY(layers);
+        };
+    }
     /** Normalized maximum y of the crown along x=z=0. */
     public double maxY(int layers) {
         return switch (this) {

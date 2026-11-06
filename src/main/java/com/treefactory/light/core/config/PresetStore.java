@@ -58,7 +58,7 @@ public final class PresetStore {
     }
     public static String encode(String name, String author, TreeConfig c) {
         JsonObject root = new JsonObject();
-        root.addProperty("name",name); root.addProperty("author",author); root.addProperty("version","1.4");
+        root.addProperty("name",name); root.addProperty("author",author); root.addProperty("version","1.5");
         root.addProperty("preset_type",c.preset().id()); root.addProperty("scale",c.scale().id()); root.addProperty("height",c.height()); root.addProperty("seed",c.seed());
         JsonObject dna = new JsonObject();
         dna.addProperty("crookedness",c.crookedness()); dna.addProperty("spread",c.spread()); dna.addProperty("fullness",c.fullness());
@@ -68,7 +68,7 @@ public final class PresetStore {
         canopy.addProperty("scale",c.canopyScale()); canopy.addProperty("density",c.attractionDensity());
         canopy.addProperty("pipe_exponent",c.pipeExponent()); canopy.addProperty("trunk_thickness",c.trunkThickness());
         canopy.addProperty("crown_stretch",c.crownStretch()); canopy.addProperty("crown_layers",c.crownLayers());
-        canopy.addProperty("crown_offset",c.crownOffset()); root.add("canopy",canopy);
+        canopy.addProperty("crown_base",c.crownBase()); root.add("canopy",canopy);
         JsonObject morphology=new JsonObject();
         morphology.addProperty("branch_angle_bias",c.branchAngleBias());
         morphology.addProperty("branch_droop",c.branchDroop());
@@ -88,7 +88,7 @@ public final class PresetStore {
         if (json.length()>16384) throw new IllegalArgumentException("Preset too large");
         JsonObject root = JsonParser.parseString(json).getAsJsonObject();
         String version=root.get("version").getAsString();
-        if (!"1.0".equals(version) && !"1.1".equals(version) && !"1.2".equals(version) && !"1.3".equals(version) && !"1.4".equals(version)) throw new IllegalArgumentException("Unsupported preset version");
+        if (!"1.0".equals(version) && !"1.1".equals(version) && !"1.2".equals(version) && !"1.3".equals(version) && !"1.4".equals(version) && !"1.5".equals(version)) throw new IllegalArgumentException("Unsupported preset version");
         String name = root.get("name").getAsString(), author = root.get("author").getAsString();
         if (name.isBlank() || name.length()>64 || author.length()>64) throw new IllegalArgumentException("Invalid preset metadata");
         JsonObject dna = root.getAsJsonObject("dna"), palette = root.getAsJsonObject("palette");
@@ -97,7 +97,7 @@ public final class PresetStore {
                 TreeScale.valueOf(root.get("scale").getAsString().toUpperCase(Locale.ROOT)),root.get("seed").getAsLong(),
                 dna.get("crookedness").getAsDouble(),dna.get("spread").getAsDouble(),dna.get("fullness").getAsDouble(),
                 palette.get("log_block").getAsString(),palette.get("leaves_block").getAsString());
-        if("1.0".equals(version)) return new Preset(id,name,author,legacy);
+        if("1.0".equals(version)) return new Preset(id,name,author,legacy.withCrownBase(legacyCrownBase(legacy,0)));
         JsonObject canopy=root.getAsJsonObject("canopy");
         BlockPalette blocks=new BlockPalette(legacy.logBlock(),palette.get("thick_branch").getAsString(),
                 palette.get("thin_branch").getAsString(),legacy.leavesBlock(),palette.get("secondary_leaf").getAsString(),
@@ -119,8 +119,29 @@ public final class PresetStore {
                 canopy.get("density").getAsDouble(),canopy.get("pipe_exponent").getAsDouble(),blocks,height,
                 canopy.has("trunk_thickness")?canopy.get("trunk_thickness").getAsDouble():1.0,
                 canopy.has("crown_stretch")?canopy.get("crown_stretch").getAsDouble():1.0,
-                canopy.has("crown_layers")?canopy.get("crown_layers").getAsInt():3,angleBias,droop,apical,gravity,
-                canopy.has("crown_offset")?canopy.get("crown_offset").getAsDouble():0);
+                canopy.has("crown_layers")?canopy.get("crown_layers").getAsInt():3,angleBias,droop,apical,gravity);
+        if ("1.5".equals(version)) {
+            config=config.withCrownBase(canopy.get("crown_base").getAsDouble());
+        } else {
+            double oldOffset=canopy.has("crown_offset")?canopy.get("crown_offset").getAsDouble():0;
+            if (!Double.isFinite(oldOffset) || oldOffset < -.2 || oldOffset > .2)
+                throw new IllegalArgumentException("Invalid legacy crown offset");
+            config=config.withCrownBase(legacyCrownBase(config,oldOffset));
+        }
         return new Preset(id,name,author,config);
+    }
+    private static double legacyCrownBase(TreeConfig config, double offset) {
+        double height=config.height();
+        double vertical=config.crownVerticalScale();
+        double center;
+        if (config.canopyShape()==CanopyShape.SPHERE) {
+            center=Math.max(height*.76,vertical+2);
+        } else {
+            center=height*.76-config.canopyShape().minY(config.crownLayers())*height*.38
+                    *config.canopyScale()*(config.crownStretch()-1);
+        }
+        center+=Math.max(1,height*(.36+offset))-height*.36;
+        double base=(center+config.canopyShape().crownMinY(config.crownLayers())*vertical)/height;
+        return Math.clamp(base,TreeConfig.MIN_CROWN_BASE,TreeConfig.MAX_CROWN_BASE);
     }
 }

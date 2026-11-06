@@ -9,11 +9,11 @@ public record TreeConfig(TreePreset preset, TreeScale scale, long seed,
                          double pipeExponent, BlockPalette blockPalette, double height, double trunkThickness,
                          double crownStretch, int crownLayers,
                          double branchAngleBias, double branchDroop, double apicalDominance,
-                         double gravityInfluence, double crownOffset) {
+                         double gravityInfluence, double crownBase) {
     public static final double MIN_HEIGHT=6, MAX_HEIGHT=48, MIN_THICKNESS=.5, MAX_THICKNESS=2.0, MIN_STRETCH=.6, MAX_STRETCH=2.0;
     public static final int MIN_LAYERS=3, MAX_LAYERS=6;
     public static final double DEFAULT_BRANCH_ANGLE_BIAS=.5, DEFAULT_BRANCH_DROOP=0, DEFAULT_APICAL_DOMINANCE=.5,
-            DEFAULT_GRAVITY_INFLUENCE=.5, MIN_CROWN_OFFSET=-.2, MAX_CROWN_OFFSET=.2;
+            DEFAULT_GRAVITY_INFLUENCE=.5, MIN_CROWN_BASE=0, MAX_CROWN_BASE=.5, DEFAULT_CROWN_BASE=.25;
     public TreeConfig {
         Objects.requireNonNull(preset);
         Objects.requireNonNull(scale);
@@ -22,7 +22,7 @@ public record TreeConfig(TreePreset preset, TreeScale scale, long seed,
         Objects.requireNonNull(canopyShape); Objects.requireNonNull(blockPalette);
         range(height,MIN_HEIGHT,MAX_HEIGHT); range(canopyScale,.75,2.0); range(attractionDensity,.5,2.0); range(pipeExponent,2.5,3.0); range(trunkThickness,MIN_THICKNESS,MAX_THICKNESS);
         range(crownStretch,MIN_STRETCH,MAX_STRETCH); range(crownLayers,MIN_LAYERS,MAX_LAYERS);
-        range(crownOffset,MIN_CROWN_OFFSET,MAX_CROWN_OFFSET);
+        range(crownBase,MIN_CROWN_BASE,MAX_CROWN_BASE);
     }
     public TreeConfig(TreePreset preset, TreeScale scale, long seed,
                       double crookedness, double spread, double fullness,
@@ -32,7 +32,7 @@ public record TreeConfig(TreePreset preset, TreeScale scale, long seed,
                       double branchAngleBias, double branchDroop, double apicalDominance, double gravityInfluence) {
         this(preset,scale,seed,crookedness,spread,fullness,canopyShape,canopyScale,attractionDensity,pipeExponent,
                 blockPalette,height,trunkThickness,crownStretch,crownLayers,branchAngleBias,branchDroop,
-                apicalDominance,gravityInfluence,0);
+                apicalDominance,gravityInfluence,DEFAULT_CROWN_BASE);
     }
     public TreeConfig(TreePreset preset, TreeScale scale, long seed,
                       double crookedness, double spread, double fullness,
@@ -83,13 +83,13 @@ public record TreeConfig(TreePreset preset, TreeScale scale, long seed,
                 .35, .6, .8, "minecraft:oak_log", "minecraft:oak_leaves");
     }
     public TreeConfig withDna(double crooked, double spread, double full) {
-        return new TreeConfig(preset, scale, seed, crooked, spread, full, canopyShape,canopyScale,attractionDensity,pipeExponent,blockPalette,height,trunkThickness,crownStretch,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence,crownOffset);
+        return new TreeConfig(preset, scale, seed, crooked, spread, full, canopyShape,canopyScale,attractionDensity,pipeExponent,blockPalette,height,trunkThickness,crownStretch,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence,crownBase);
     }
     public TreeConfig withScale(TreeScale size) {
-        return new TreeConfig(preset, size, seed, crookedness, spread, fullness, canopyShape,canopyScale,attractionDensity,pipeExponent,blockPalette,size.height,trunkThickness,crownStretch,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence,crownOffset);
+        return new TreeConfig(preset, size, seed, crookedness, spread, fullness, canopyShape,canopyScale,attractionDensity,pipeExponent,blockPalette,size.height,trunkThickness,crownStretch,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence,crownBase);
     }
     public TreeConfig withHeight(double blocks) {
-        return new TreeConfig(preset, nearestScale(blocks), seed, crookedness, spread, fullness, canopyShape,canopyScale,attractionDensity,pipeExponent,blockPalette,blocks,trunkThickness,crownStretch,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence,crownOffset);
+        return new TreeConfig(preset, nearestScale(blocks), seed, crookedness, spread, fullness, canopyShape,canopyScale,attractionDensity,pipeExponent,blockPalette,blocks,trunkThickness,crownStretch,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence,crownBase);
     }
     private static TreeScale nearestScale(double blocks) {
         TreeScale best=TreeScale.MEDIUM;
@@ -97,11 +97,11 @@ public record TreeConfig(TreePreset preset, TreeScale scale, long seed,
         return best;
     }
     public TreeConfig withSeed(long value) {
-        return new TreeConfig(preset, scale, value, crookedness, spread, fullness, canopyShape,canopyScale,attractionDensity,pipeExponent,blockPalette,height,trunkThickness,crownStretch,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence,crownOffset);
+        return new TreeConfig(preset, scale, value, crookedness, spread, fullness, canopyShape,canopyScale,attractionDensity,pipeExponent,blockPalette,height,trunkThickness,crownStretch,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence,crownBase);
     }
     public TreeConfig withPreset(TreePreset type) {
         String wood = type == TreePreset.PINE ? "spruce" : "oak";
-        return new TreeConfig(type,scale,seed,crookedness,spread,fullness,CanopyShape.forPreset(type),canopyScale,attractionDensity,pipeExponent,BlockPalette.defaults(wood),height,trunkThickness,crownStretch,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence,crownOffset);
+        return new TreeConfig(type,scale,seed,crookedness,spread,fullness,CanopyShape.forPreset(type),canopyScale,attractionDensity,pipeExponent,BlockPalette.defaults(wood),height,trunkThickness,crownStretch,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence,crownBase);
     }
     public TreeConfig withPalette(String log, String leaves) {
         return withBlockPalette(blockPalette.withMainAndPrimary(log,leaves));
@@ -109,34 +109,44 @@ public record TreeConfig(TreePreset preset, TreeScale scale, long seed,
     public String logBlock() { return blockPalette.mainTrunk(); }
     public String leavesBlock() { return blockPalette.primaryLeaf(); }
     public TreeConfig withCanopy(CanopyShape shape,double scale,double density) {
-        return new TreeConfig(preset,this.scale,seed,crookedness,spread,fullness,shape,scale,density,pipeExponent,blockPalette,height,trunkThickness,crownStretch,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence,crownOffset);
+        return new TreeConfig(preset,this.scale,seed,crookedness,spread,fullness,shape,scale,density,pipeExponent,blockPalette,height,trunkThickness,crownStretch,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence,crownBase);
     }
     public TreeConfig withPipeExponent(double exponent) {
-        return new TreeConfig(preset,scale,seed,crookedness,spread,fullness,canopyShape,canopyScale,attractionDensity,exponent,blockPalette,height,trunkThickness,crownStretch,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence,crownOffset);
+        return new TreeConfig(preset,scale,seed,crookedness,spread,fullness,canopyShape,canopyScale,attractionDensity,exponent,blockPalette,height,trunkThickness,crownStretch,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence,crownBase);
     }
     public TreeConfig withTrunkThickness(double value) {
-        return new TreeConfig(preset,scale,seed,crookedness,spread,fullness,canopyShape,canopyScale,attractionDensity,pipeExponent,blockPalette,height,value,crownStretch,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence,crownOffset);
+        return new TreeConfig(preset,scale,seed,crookedness,spread,fullness,canopyShape,canopyScale,attractionDensity,pipeExponent,blockPalette,height,value,crownStretch,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence,crownBase);
     }
     public TreeConfig withCrownStretch(double value) {
-        return new TreeConfig(preset,scale,seed,crookedness,spread,fullness,canopyShape,canopyScale,attractionDensity,pipeExponent,blockPalette,height,trunkThickness,value,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence,crownOffset);
+        return new TreeConfig(preset,scale,seed,crookedness,spread,fullness,canopyShape,canopyScale,attractionDensity,pipeExponent,blockPalette,height,trunkThickness,value,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence,crownBase);
     }
     public TreeConfig withCrownLayers(int value) {
-        return new TreeConfig(preset,scale,seed,crookedness,spread,fullness,canopyShape,canopyScale,attractionDensity,pipeExponent,blockPalette,height,trunkThickness,crownStretch,value,branchAngleBias,branchDroop,apicalDominance,gravityInfluence,crownOffset);
+        return new TreeConfig(preset,scale,seed,crookedness,spread,fullness,canopyShape,canopyScale,attractionDensity,pipeExponent,blockPalette,height,trunkThickness,crownStretch,value,branchAngleBias,branchDroop,apicalDominance,gravityInfluence,crownBase);
     }
     public TreeConfig withBlockPalette(BlockPalette palette) {
-        return new TreeConfig(preset,scale,seed,crookedness,spread,fullness,canopyShape,canopyScale,attractionDensity,pipeExponent,palette,height,trunkThickness,crownStretch,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence,crownOffset);
+        return new TreeConfig(preset,scale,seed,crookedness,spread,fullness,canopyShape,canopyScale,attractionDensity,pipeExponent,palette,height,trunkThickness,crownStretch,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence,crownBase);
     }
     public TreeConfig withMorphology(double branchAngleBias, double branchDroop, double apicalDominance) {
         return withMorphology(branchAngleBias,branchDroop,apicalDominance,gravityInfluence);
     }
     public TreeConfig withMorphology(double branchAngleBias, double branchDroop, double apicalDominance, double gravityInfluence) {
-        return new TreeConfig(preset,scale,seed,crookedness,spread,fullness,canopyShape,canopyScale,attractionDensity,pipeExponent,blockPalette,height,trunkThickness,crownStretch,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence,crownOffset);
+        return new TreeConfig(preset,scale,seed,crookedness,spread,fullness,canopyShape,canopyScale,attractionDensity,pipeExponent,blockPalette,height,trunkThickness,crownStretch,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence,crownBase);
     }
     public TreeConfig withGravityInfluence(double value) {
         return withMorphology(branchAngleBias,branchDroop,apicalDominance,value);
     }
-    public TreeConfig withCrownOffset(double value) {
+    public TreeConfig withCrownBase(double value) {
         return new TreeConfig(preset,scale,seed,crookedness,spread,fullness,canopyShape,canopyScale,attractionDensity,pipeExponent,blockPalette,height,trunkThickness,crownStretch,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence,value);
     }
-    public double initialTrunkHeight() { return Math.max(1,height*(.36+crownOffset)); }
+    /** The crown position is measured from the placement point, as a fraction of configured height. */
+    public double crownBaseHeight() { return height*crownBase; }
+    public double crownVerticalScale() {
+        return canopyShape==CanopyShape.SPHERE
+                ? height*(.22+.38*spread)*canopyScale
+                : height*.38*canopyScale*crownStretch;
+    }
+    public double crownCenterHeight() {
+        return crownBaseHeight() - canopyShape.crownMinY(crownLayers)*crownVerticalScale();
+    }
+    public double initialTrunkHeight() { return Math.max(1,crownBaseHeight()); }
 }
