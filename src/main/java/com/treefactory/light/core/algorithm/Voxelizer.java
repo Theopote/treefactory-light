@@ -70,7 +70,7 @@ public final class Voxelizer {
             }
             double cap=Math.max(1.0,config.height()*.055);
             double lateral=Math.hypot(parent.position().x()-.5,parent.position().z()-.5);
-            Material wood=parent.position().y()<config.height()*.36+1 && lateral<=cap+.8
+            Material wood=parent.position().y()<config.initialTrunkHeight()+1 && lateral<=cap+.8
                     ? Material.MAIN_TRUNK : radius>=.7 ? Material.THICK_BRANCH : Material.THIN_BRANCH;
             Axis axis=axis(parent.position(),node.position());
             fill(acc,parent.position(),node.position(),parent.radius(),node.radius(),wood,axis,cancelled,config.seed(),config.blockPalette());

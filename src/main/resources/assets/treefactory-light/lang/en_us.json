@@ -45,6 +45,8 @@
   "treefactory.gravity_influence": "Gravity influence %s%%",
   "treefactory.trunk_thickness": "Trunk thickness x%s",
   "treefactory.crown_stretch": "Crown stretch x%s",
+  "treefactory.crown_offset": "Crown position %s%%",
+  "treefactory.crown_offset.tip": "Moves the crown and branch starting area up or down as a percentage of tree height. Higher values expose more trunk.",
   "treefactory.crown_stretch.tip": "Stretches or squashes the crown vertically (not used by the sphere).",
   "treefactory.crown_layers": "Umbrella layers %s",
   "treefactory.crown_layers.tip": "Number of layers of the layered spindle crown (3-6).",

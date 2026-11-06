@@ -20,6 +20,7 @@ public final class DNAControlSlider extends AbstractSliderButton {
             case "treefactory.pipe_exponent" -> String.format(Locale.ROOT,"%.2f",2.5+.5*value);
             case "treefactory.trunk_thickness" -> String.format(Locale.ROOT,"%.2f",.5+1.5*value);
             case "treefactory.crown_stretch" -> String.format(Locale.ROOT,"%.2f",.6+1.4*value);
+            case "treefactory.crown_offset" -> String.format(Locale.ROOT,"%+.0f",(-.2+.4*value)*100);
             case "treefactory.crown_layers" -> 3+(int)Math.round(3*value);
             case "treefactory.gravity_influence" -> (int)Math.round(value*100);
             default -> (int)Math.round(value*100);

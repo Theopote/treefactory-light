@@ -45,6 +45,8 @@
   "treefactory.gravity_influence": "重力影响 %s%%",
   "treefactory.trunk_thickness": "树干粗细 ×%s",
   "treefactory.crown_stretch": "树冠纵向拉伸 ×%s",
+  "treefactory.crown_offset": "树冠位置 %s%%",
+  "treefactory.crown_offset.tip": "整体上下移动树冠和分枝起点，数值按树木高度计算；向上调整会露出更多树干。",
   "treefactory.crown_stretch.tip": "在垂直方向拉伸或压缩树冠形状（球形不适用）。",
   "treefactory.crown_layers": "伞层数 %s",
   "treefactory.crown_layers.tip": "梭形叠伞树冠的层数（3～6）。",

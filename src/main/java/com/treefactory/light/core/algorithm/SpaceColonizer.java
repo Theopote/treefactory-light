@@ -27,7 +27,9 @@ public final class SpaceColonizer {
         }
         double leanAngle = random.nextDouble()*Math.PI*2;
         double leanMag = height*.05*(.3+config.crookedness()*1.4);
-        double trunkTop = Math.max(2,height*.36);
+        double trunkHeight = config.initialTrunkHeight();
+        crownCenter += trunkHeight - height*.36;
+        double trunkTop = Math.max(2,trunkHeight);
         double crownDX = Math.cos(leanAngle)*leanMag*1.5, crownDZ = Math.sin(leanAngle)*leanMag*1.5;
         List<Vector3> attractors = new ArrayList<>();
         int count = Math.min(1500,(int)((180 + 400 * config.fullness()) * config.attractionDensity()));
@@ -49,7 +51,7 @@ public final class SpaceColonizer {
         }
         List<TreeNode> nodes = new ArrayList<>();
         nodes.add(new TreeNode(new Vector3(.5,.5,.5), -1, .5));
-        for (int y = 1; y <= height*.36; y++) {
+        for (int y = 1; y <= trunkHeight; y++) {
             double t = Math.min(1,y/trunkTop), ease = t*t;
             double wob = (.25+config.crookedness()*.9);
             double bx = Math.cos(leanAngle)*leanMag*ease + wob*noise.sample(y*.19+11.3,5.1,2.2);
@@ -133,7 +135,7 @@ public final class SpaceColonizer {
     /** Mangrove-like presets: diagonal stilt roots from the lower trunk. */
     private static void addPropRoots(List<TreeNode> nodes, Set<Cell> occupied, TreeConfig config, Random random,
                                      BooleanSupplier cancelled) {
-        int maxTrunk = Math.min(nodes.size(), (int)(config.height() * 0.15) + 2);
+        int maxTrunk = Math.min(1 + (int)config.initialTrunkHeight(), (int)(config.height() * 0.15) + 2);
         if (maxTrunk < 2) return;
         int roots = 4 + random.nextInt(3);
         for (int r = 0; r < roots && nodes.size() < MAX_NODES; r++) {
