@@ -16,7 +16,7 @@ import org.jspecify.annotations.NonNull;
 import java.util.*;
 
 public final class DrawerScreen extends Screen {
-    private static final int M = 6, TOP = 44, TITLE_H = 16, BOTTOM_BAR = 28, SCROLLBAR_W = 4, SHAPE_COLS = 4;
+    private static final int M = 6, TOP = 36, TITLE_H = 14, BOTTOM_BAR = 20, SCROLLBAR_W = 4, SHAPE_COLS = 4;
     private static final CanopyShape[] SHAPE_ORDER = {
             CanopyShape.CONE, CanopyShape.TRUNCATED_CONE, CanopyShape.CYLINDER, CanopyShape.SPINDLE,
             CanopyShape.PARABOLOID, CanopyShape.OVOID, CanopyShape.PROLATE_ELLIPSOID, CanopyShape.SPHERE,
@@ -122,13 +122,13 @@ public final class DrawerScreen extends Screen {
         addContent(new SectionLabel(M, y - scroll, w, "treefactory.section.structure"));
         y += 16;
         addContent(new ScaleSlider(M, y - scroll, w, c.height(), h -> state.update(state.config().withHeight(h))));
-        y += 24;
+        y += 18;
         addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.trunk_thickness", (c.trunkThickness() - .5) / 1.5,
                 v -> state.update(state.config().withTrunkThickness(.5 + 1.5 * v))));
-        y += 22;
+        y += 16;
         addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.crookedness", c.crookedness(),
                 v -> state.update(state.config().withDna(v, state.config().spread(), state.config().fullness()))));
-        y += 24;
+        y += 18;
 
         addContent(new SectionLabel(M, y - scroll, w, "treefactory.section.canopy"));
         y += 16;
@@ -146,27 +146,27 @@ public final class DrawerScreen extends Screen {
                     TreeConfig now = state.config();
                     state.update(now.withCanopy(now.canopyShape(), .75 + 1.25 * v, now.attractionDensity()));
                 }));
-        y += 22;
+        y += 16;
         addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.crown_offset",
                 (c.crownBase() - TreeConfig.MIN_CROWN_BASE) / (TreeConfig.MAX_CROWN_BASE - TreeConfig.MIN_CROWN_BASE),
                 v -> state.update(state.config().withCrownBase(TreeConfig.MIN_CROWN_BASE
                         + (TreeConfig.MAX_CROWN_BASE - TreeConfig.MIN_CROWN_BASE) * v))));
-        y += 22;
+                                y += 16;
         addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.spread", c.spread(),
                 v -> state.update(state.config().withDna(state.config().crookedness(), v, state.config().fullness()))));
-        y += 22;
+                                y += 16;
         addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.fullness", c.fullness(),
                 v -> state.update(state.config().withDna(state.config().crookedness(), state.config().spread(), v))));
-        y += 22;
+                                y += 16;
         if (c.canopyShape().stretchable()) {
             addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.crown_stretch", (c.crownStretch() - .6) / 1.4,
                     v -> state.update(state.config().withCrownStretch(.6 + 1.4 * v))));
-            y += 22;
+                                y += 16;
         }
         if (c.canopyShape().layered()) {
             addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.crown_layers", (c.crownLayers() - 3) / 3.0,
                     v -> state.update(state.config().withCrownLayers(3 + (int) Math.round(3 * v)))));
-            y += 22;
+                                y += 16;
         }
 
         addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.attraction_density", (c.attractionDensity() - .5) / 1.5,
@@ -174,13 +174,13 @@ public final class DrawerScreen extends Screen {
                     TreeConfig now = state.config();
                     state.update(now.withCanopy(now.canopyShape(), now.canopyScale(), .5 + 1.5 * v));
                 }));
-        y += 22;
+        y += 16;
         addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.pipe_exponent", (c.pipeExponent() - 2.5) / .5,
                 v -> state.update(state.config().withPipeExponent(2.5 + .5 * v))));
-        y += 22;
+        y += 16;
         addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.gravity_influence", c.gravityInfluence(),
                 v -> state.update(state.config().withGravityInfluence(v))));
-        y += 22;
+        y += 16;
 
         Button materialsBtn = button(M, y - scroll, w, "treefactory.choose_materials", () -> {
             materialsOpen = !materialsOpen;
@@ -188,16 +188,16 @@ public final class DrawerScreen extends Screen {
         });
         materialsBtn.setMessage(Component.translatable("treefactory.choose_materials").append(materialsOpen ? " ▶" : " ◀"));
         addContent(materialsBtn);
-        y += 24;
+        y += 18;
         int saveHalf = (w - 2) / 2;
-        EditBox presetNameBox = new EditBox(font, M, y - scroll, saveHalf, 20, Component.translatable("treefactory.preset_name"));
+        EditBox presetNameBox = new EditBox(font, M, y - scroll, saveHalf, 14, Component.translatable("treefactory.preset_name"));
         presetNameBox.setMaxLength(64);
         presetNameBox.setValue(presetName);
         presetNameBox.setHint(Component.translatable("treefactory.preset_name"));
         presetNameBox.setResponder(v -> presetName = v);
         addContent(presetNameBox);
         addContent(button(M + saveHalf + 2, y - scroll, saveHalf, "treefactory.save_preset", () -> state.save(presetName)));
-        y += 22;
+                y += 16;
         contentHeight = y - TOP;
     }
 
@@ -267,7 +267,7 @@ public final class DrawerScreen extends Screen {
     }
 
     private Button button(int x, int y, int width, String key, Runnable action) {
-        Button b = Button.builder(Component.translatable(key), btn -> action.run()).bounds(x, y, width, 20).build();
+        Button b = Button.builder(Component.translatable(key), btn -> action.run()).bounds(x, y, width, 14).build();
         if (TIPPED.contains(key)) {
             b.setTooltip(Tooltip.create(Component.translatable(key + ".tip")));
         }

@@ -11,7 +11,7 @@ public final class DNAControlSlider extends AbstractSliderButton {
     private final String key;
     private final DoubleConsumer changed;
     public DNAControlSlider(int x,int y,int width,String key,double value,DoubleConsumer changed) {
-        super(x,y,width,20,Component.empty(),value); this.key=key; this.changed=changed; updateMessage();
+        super(x,y,width,14,Component.empty(),value); this.key=key; this.changed=changed; updateMessage();
         setTooltip(Tooltip.create(Component.translatable(key+".tip")));
     }
     @Override protected void updateMessage() {

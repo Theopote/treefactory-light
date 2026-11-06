@@ -11,7 +11,7 @@ public final class ScaleSlider extends AbstractSliderButton {
     private static final double MIN=TreeConfig.MIN_HEIGHT, MAX=TreeConfig.MAX_HEIGHT;
     private final DoubleConsumer changed;
     public ScaleSlider(int x,int y,int width,double height,DoubleConsumer changed) {
-        super(x,y,width,20,Component.empty(),(height-MIN)/(MAX-MIN));
+        super(x,y,width,14,Component.empty(),(height-MIN)/(MAX-MIN));
         this.changed=changed; updateMessage();
         setTooltip(Tooltip.create(Component.translatable("treefactory.size.tip")));
     }

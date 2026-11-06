@@ -12,7 +12,7 @@ public final class ShapeButton extends Button {
     public static final int ICON=14;
     private final CanopyShape shape;
     public ShapeButton(int x,int y,int width,Component label,CanopyShape shape,Runnable action) {
-        super(x,y,width,20,label,b->action.run(),DEFAULT_NARRATION);
+        super(x,y,width,14,label,b->action.run(),DEFAULT_NARRATION);
         this.shape=shape;
     }
     public CanopyShape shape() { return shape; }

@@ -77,7 +77,7 @@ final class MaterialPanel {
         this.width = width;
         this.height = height;
         this.gridTop = 22 + TAB_SIZE + 18 + 24;
-        this.gridBottom = height - 78;
+        this.gridBottom = height - 60;
         this.rebuild = rebuild;
         int rowW = width - 16;
         int tabGap = Math.max(2, (rowW - ROLES.length * TAB_SIZE) / (ROLES.length + 1));
@@ -89,8 +89,7 @@ final class MaterialPanel {
                     .append(Component.translatable("treefactory.materials.tab.tip"))));
             add.accept(tab);
         }
-        EditBox search = new EditBox(font, left + 8, 22 + TAB_SIZE + 18, width - 16, 16,
-                Component.translatable("treefactory.materials.search"));
+        EditBox search = new EditBox(font, left + 8, 22 + TAB_SIZE + 18,         width - 16, 14,                Component.translatable("treefactory.materials.search"));
         search.setHint(Component.translatable("treefactory.materials.search"));
         search.setTooltip(Tooltip.create(Component.translatable("treefactory.materials.search.tip")));
         search.setMaxLength(48);
@@ -107,19 +106,19 @@ final class MaterialPanel {
         add.accept(more);
         var palette = state.config().blockPalette();
         int half = (width - 18) / 2;
-        secondarySlider = new DNAControlSlider(left + 8, height - 46, half, "treefactory.secondary_weight", palette.secondaryWeight(),
+        secondarySlider = new DNAControlSlider(left + 8, height - 36, half, "treefactory.secondary_weight", palette.secondaryWeight(),
                 v -> setWeights(v, state.config().blockPalette().accentWeight()));
-        accentSlider = new DNAControlSlider(left + 10 + half, height - 46, half, "treefactory.accent_weight", palette.accentWeight(),
+        accentSlider = new DNAControlSlider(left + 10 + half, height - 36, half, "treefactory.accent_weight", palette.accentWeight(),
                 v -> setWeights(state.config().blockPalette().secondaryWeight(), v));
         add.accept(secondarySlider);
         add.accept(accentSlider);
         add.accept(Button.builder(Component.translatable("treefactory.materials.reset"), b -> {
             state.update(state.config().withBlockPalette(defaults()));
             rebuild.run();
-        }).bounds(left + 8, height - 22, half, 20)
+        }).bounds(left + 8, height - 18, half, 14)
                 .tooltip(Tooltip.create(Component.translatable("treefactory.materials.reset.tip"))).build());
         add.accept(Button.builder(Component.translatable("treefactory.materials.close"), b -> close.run())
-                .bounds(left + 10 + half, height - 22, half, 20)
+                .bounds(left + 10 + half, height - 18, half, 14)
                 .tooltip(Tooltip.create(Component.translatable("treefactory.materials.close.tip"))).build());
     }
 
@@ -194,7 +193,7 @@ final class MaterialPanel {
     void render(GuiGraphicsExtractor g, Font font, int mouseX, int mouseY) {
         g.fill(x, 0, x + width, height, 0xF00B1814);
         g.fill(x + width - 1, 0, x + width, height, 0xFF808080);
-        g.fill(x, 0, x + width - 1, 16, 0xFF3C3F3E);
+        g.fill(x, 0, x + width - 1, 14, 0xFF3C3F3E);
         g.text(font, Component.translatable("treefactory.materials.title"), x + 6, 4, 0xFFFFFFFF);
 
         Component roleName = Component.translatable(ROLE_KEYS[role.ordinal()]);
@@ -204,7 +203,7 @@ final class MaterialPanel {
         double primary = Math.max(0, 1 - palette.secondaryWeight() - palette.accentWeight());
         Component mix = Component.translatable("treefactory.leaf_mix",
                 Math.round(primary * 100), Math.round(palette.secondaryWeight() * 100), Math.round(palette.accentWeight() * 100));
-        g.text(font, font.plainSubstrByWidth(mix.getString(), width - 16), x + 8, height - 68, 0xFFFFFFFF);
+        g.text(font, font.plainSubstrByWidth(mix.getString(), width - 16), x + 8, height - 56, 0xFFFFFFFF);
 
         List<Block> blocks = visible();
         scroll = Math.clamp(scroll, 0, maxScroll(blocks.size()));
@@ -229,7 +228,7 @@ final class MaterialPanel {
         Block shown = hovered != null ? hovered : block(current).orElse(null);
         if (shown != null) {
             String line = shown.getName().getString();
-            g.text(font, font.plainSubstrByWidth(line, width - 16), x + 8, height - 58, 0xFFFFFFFF);
+            g.text(font, font.plainSubstrByWidth(line, width - 16), x + 8, height - 46, 0xFFFFFFFF);
         }
     }
 
