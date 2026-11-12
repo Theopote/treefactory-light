@@ -37,8 +37,19 @@ public final class PresetCardWidget extends Button {
         Component label=preset.id().startsWith("builtin-")
                 ? Component.translatable("treefactory.builtin."+preset.id().substring("builtin-".length()))
                 : Component.literal(preset.name());
-        String text=font.plainSubstrByWidth(label.getString(), Math.max(0,width-8));
+        int avail=Math.max(0,width-8), textW=font.width(label.getString());
         graphics.fill(getX()+2,getY()+height-13,getX()+width-2,getY()+height-2,0xC010201B);
-        graphics.text(font,text,getX()+4,getY()+height-12,0xFFFFFFFF);
+        int offset=0;
+        if(textW>avail) {
+            // Ping-pong scroll so the whole name can be read; static while not hovered.
+            int overflow=textW-avail;
+            if(isHovered()) {
+                double phase=(System.nanoTime()/1_000_000_000.0*20)%(2.0*(overflow+30));
+                offset=(int)Math.max(0,Math.min(overflow,phase<overflow+30 ? phase-15 : 2.0*overflow+45-phase));
+            }
+            graphics.enableScissor(getX()+4,getY()+height-13,getX()+width-4,getY()+height-2);
+        }
+        graphics.text(font,label.getString(),getX()+4-offset,getY()+height-12,0xFFFFFFFF);
+        if(textW>avail) graphics.disableScissor();
     }
 }

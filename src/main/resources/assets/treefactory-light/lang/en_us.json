@@ -108,6 +108,8 @@
   "treefactory.commit_failed": "Could not confirm the tree; adjust placement and try again",
   "treefactory.tree_incomplete": "The tree cannot be placed here without breaking its structure",
   "treefactory.presets_skipped": "Skipped %s incompatible or damaged presets",
+  "treefactory.shapes.expand": "Canopy shape: %s ▼",
+  "treefactory.shapes.collapse": "Canopy shape: %s ▲",
   "treefactory.tree_mostly_blocked": "Too much of the trunk and branches is blocked here; less than half would remain",
   "key.treefactory-light.undo": "Undo last tree",
   "key.category.treefactory-light.controls": "Treefactory Light",

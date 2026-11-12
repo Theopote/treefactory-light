@@ -36,7 +36,7 @@ public final class DrawerScreen extends Screen {
     private final Map<AbstractWidget, PresetStore.Preset> cards = new HashMap<>();
 
     private int panel, scroll, contentHeight;
-    private boolean library, materialsOpen;
+    private boolean library, materialsOpen, shapesOpen = true;
     private ShapeGrid shapeGrid;
     private Button finishButton;
     private PresetStore.Preset menuPreset;
@@ -137,13 +137,19 @@ public final class DrawerScreen extends Screen {
 
         addContent(new SectionLabel(M, y - scroll, w, "treefactory.section.canopy"));
         y += 16;
-        shapeGrid = new ShapeGrid(M, y - scroll, w, SHAPE_ORDER, c.canopyShape(), shape -> {
-            TreeConfig now = state.config();
-            state.update(now.withCanopy(shape, now.canopyScale(), now.attractionDensity()));
-            refresh();
-        });
-        addContent(shapeGrid);
-        y += shapeGrid.getHeight() + 4;
+        Component shapeName = Component.translatable("treefactory.canopy." + c.canopyShape().name().toLowerCase(java.util.Locale.ROOT));
+        addContent(Button.builder(Component.translatable(shapesOpen ? "treefactory.shapes.collapse" : "treefactory.shapes.expand", shapeName),
+                btn -> { shapesOpen = !shapesOpen; refresh(); }).bounds(M, y - scroll, w, 14).build());
+        y += 18;
+        if (shapesOpen) {
+            shapeGrid = new ShapeGrid(M, y - scroll, w, SHAPE_ORDER, c.canopyShape(), shape -> {
+                TreeConfig now = state.config();
+                state.update(now.withCanopy(shape, now.canopyScale(), now.attractionDensity()));
+                refresh();
+            });
+            addContent(shapeGrid);
+            y += shapeGrid.getHeight() + 4;
+        }
 
         addContent(new ParamSlider(M, y - scroll, w, "treefactory.canopy_size", normalize(c.canopyScale(),TreeConfig.MIN_CANOPY_SCALE,TreeConfig.MAX_CANOPY_SCALE),
                 v -> {
@@ -327,19 +333,21 @@ public final class DrawerScreen extends Screen {
 
         int statusLeft = (materialsOpen && !library ? materialLeft + materialWidth : panel) + 10;
         int statusRight = width - 10;
-        Component info = Component.literal(state.status());
-        String clipped = font.plainSubstrByWidth(info.getString(), Math.max(40, statusRight - statusLeft));
-        int infoX = statusRight - font.width(clipped);
-        if (!clipped.isEmpty()) {
-            g.fill(infoX - 3, height - 16, statusRight + 3, height - 3, 0xC010201B);
-            g.text(font, clipped, infoX, height - 14, 0xFFFFFFFF);
+        var infoLines = font.split(Component.literal(state.status()), Math.max(40, statusRight - statusLeft));
+        if (!state.status().isEmpty()) {
+            int lineH = font.lineHeight + 1, boxTop = height - 3 - infoLines.size() * lineH - 2;
+            int boxW = infoLines.stream().mapToInt(font::width).max().orElse(0);
+            g.fill(statusRight - boxW - 3, boxTop, statusRight + 3, height - 3, 0xC010201B);
+            for (int i = 0; i < infoLines.size(); i++)
+                g.text(font, infoLines.get(i), statusRight - font.width(infoLines.get(i)), boxTop + 2 + i * lineH, 0xFFFFFFFF);
         }
 
-        Component hint = Component.translatable("treefactory.preview_hint");
-        String hintText=font.plainSubstrByWidth(hint.getString(), Math.max(0, width - statusLeft - 20));
-        if (!hintText.isEmpty()) {
-            g.fill(statusLeft - 3, 4, statusLeft + font.width(hintText) + 3, 17, 0xC010201B);
-            g.text(font, hintText, statusLeft, 6, 0xFFFFFFFF);
+        var hintLines = font.split(Component.translatable("treefactory.preview_hint"), Math.max(40, width - statusLeft - 20));
+        if (!hintLines.isEmpty()) {
+            int lineH = font.lineHeight + 1;
+            int hintW = hintLines.stream().mapToInt(font::width).max().orElse(0);
+            g.fill(statusLeft - 3, 4, statusLeft + hintW + 3, 8 + hintLines.size() * lineH, 0xC010201B);
+            for (int i = 0; i < hintLines.size(); i++) g.text(font, hintLines.get(i), statusLeft, 6 + i * lineH, 0xFFFFFFFF);
         }
 
     }

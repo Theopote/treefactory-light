@@ -108,6 +108,8 @@
   "treefactory.commit_failed": "无法确认建造，请调整放置位置后重试",
   "treefactory.tree_incomplete": "此处无法完整放置树木，结构会遭到破坏",
   "treefactory.presets_skipped": "已跳过 %s 个不兼容或损坏的预设",
+  "treefactory.shapes.expand": "树冠形状：%s ▼",
+  "treefactory.shapes.collapse": "树冠形状：%s ▲",
   "treefactory.tree_mostly_blocked": "此处被阻挡的木头过多，只能保留不到一半的树干和枝条",
   "key.treefactory-light.undo": "撤销上一棵树",
   "key.category.treefactory-light.controls": "Treefactory Light",
