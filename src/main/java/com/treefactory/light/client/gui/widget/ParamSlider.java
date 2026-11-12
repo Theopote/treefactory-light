@@ -7,10 +7,10 @@ import com.treefactory.light.core.config.TreeConfig;
 import java.util.function.DoubleConsumer;
 import java.util.Locale;
 
-public final class DNAControlSlider extends AbstractSliderButton {
+public final class ParamSlider extends AbstractSliderButton {
     private final String key;
     private final DoubleConsumer changed;
-    public DNAControlSlider(int x,int y,int width,String key,double value,DoubleConsumer changed) {
+    public ParamSlider(int x,int y,int width,String key,double value,DoubleConsumer changed) {
         super(x,y,width,14,Component.empty(),value); this.key=key; this.changed=changed; updateMessage();
         setTooltip(Tooltip.create(Component.translatable(key+".tip")));
     }

@@ -79,8 +79,8 @@ public enum CanopyShape implements ICanopyShape {
     };
     /** Shapes other than the layered spindle ignore the layer count. */
     public double field(double x,double y,double z,int layers) { return field(x,y,z); }
-    /** Vertical stretch applies to every shape except the sphere. */
-    public boolean stretchable() { return this!=SPHERE; }
+    /** Vertical stretch applies independently of horizontal spread. */
+    public boolean stretchable() { return true; }
     public boolean layered() { return this==SPINDLE_MULTI_LAYER; }
     /**
      * Normalized minimum y of the crown along x=z=0. Used to anchor the crown base when stretching.
@@ -139,7 +139,7 @@ public enum CanopyShape implements ICanopyShape {
         double radius2=Math.pow(t,alpha)*Math.pow(1-t,beta)/maximum;
         return Math.max(Math.abs(y)-1,x*x+z*z-radius2);
     }
-    public static CanopyShape forPreset(TreePreset preset) {
+    public static CanopyShape forPreset(TreeType preset) {
         return switch(preset) { case PINE -> CONE; case WILLOW -> UMBRELLA; case DEAD -> HEMISPHERE; default -> ELLIPSOID; };
     }
 }

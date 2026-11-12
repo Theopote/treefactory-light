@@ -58,22 +58,22 @@ class TreeAlgorithmsTest {
         assertTrue(voxels.axes().keySet().stream().allMatch(c->voxels.blocks().get(c).woody()));
     }
     @Test void allPresetsAndSizesStayInsideBudgets() {
-        for(TreePreset preset:TreePreset.values()) for(TreeScale size:TreeScale.values()) {
-            var result=new TreeBuildTask().build(TreeConfig.defaults().withPreset(preset).withScale(size),()->false);
+        for(TreeType preset:TreeType.values()) for(TreeScale size:TreeScale.values()) {
+            var result=new TreeBuildTask().build(TreeConfig.defaults().withTreeType(preset).withScale(size),()->false);
             assertFalse(result.blocks().isEmpty()); assertTrue(result.blocks().size()<=Voxelizer.MAX_BLOCKS);
-            if(preset==TreePreset.DEAD) assertTrue(result.blocks().values().stream().allMatch(Voxelizer.Material::woody));
+            if(preset==TreeType.DEAD) assertTrue(result.blocks().values().stream().allMatch(Voxelizer.Material::woody));
         }
     }
     @Test void cancelledWorkStopsAndInvalidDnaIsRejected() {
         assertThrows(CancellationException.class,()->new TreeBuildTask().build(TreeConfig.defaults(),()->true));
-        assertThrows(IllegalArgumentException.class,()->TreeConfig.defaults().withDna(Double.NaN,.5,.5));
-        assertThrows(IllegalArgumentException.class,()->TreeConfig.defaults().withDna(.5,1.1,.5));
+        assertThrows(IllegalArgumentException.class,()->TreeConfig.defaults().withParameters(Double.NaN,.5,.5));
+        assertThrows(IllegalArgumentException.class,()->TreeConfig.defaults().withParameters(.5,1.1,.5));
         assertThrows(IllegalArgumentException.class,()->TreeConfig.defaults().withPalette("../bad","minecraft:oak_leaves"));
     }
     @Test void extremeDnaAndNegativeSeedsRemainBounded() {
-        for(TreePreset preset:TreePreset.values()) for(int bits=0;bits<8;bits++) {
-            TreeConfig config=TreeConfig.defaults().withPreset(preset).withScale(TreeScale.GIANT).withSeed(-91237)
-                    .withDna(bits&1,(bits>>1)&1,(bits>>2)&1);
+        for(TreeType preset:TreeType.values()) for(int bits=0;bits<8;bits++) {
+            TreeConfig config=TreeConfig.defaults().withTreeType(preset).withScale(TreeScale.GIANT).withSeed(-91237)
+                    .withParameters(bits&1,(bits>>1)&1,(bits>>2)&1);
             var result=new TreeBuildTask().build(config,()->false);
             assertTrue(result.blocks().size()<=Voxelizer.MAX_BLOCKS);
             assertTrue(result.blocks().values().stream().anyMatch(Voxelizer.Material::woody));
@@ -81,8 +81,8 @@ class TreeAlgorithmsTest {
         }
     }
     @Test void generatedLogsFormOneFaceConnectedTree() {
-        for(TreePreset preset:TreePreset.values()) {
-            var blocks=new TreeBuildTask().build(TreeConfig.defaults().withPreset(preset),()->false).blocks();
+        for(TreeType preset:TreeType.values()) {
+            var blocks=new TreeBuildTask().build(TreeConfig.defaults().withTreeType(preset),()->false).blocks();
             Set<Cell> logs=new HashSet<>(); blocks.forEach((cell,material)->{if(material.woody()) logs.add(cell);});
             Deque<Cell> queue=new ArrayDeque<>(); Cell first=logs.iterator().next(); logs.remove(first); queue.add(first);
             int[][] steps={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
@@ -138,7 +138,7 @@ class TreeAlgorithmsTest {
         assertTrue(result.blocks().size()<=Voxelizer.MAX_BLOCKS);
     }
     @Test void giantWillowSharesDroopingGrowthAcrossTips() {
-        var nodes=new SpaceColonizer().generate(TreeConfig.defaults().withPreset(TreePreset.WILLOW).withScale(TreeScale.GIANT));
+        var nodes=new SpaceColonizer().generate(TreeConfig.defaults().withTreeType(TreeType.WILLOW).withScale(TreeScale.GIANT));
         int crownNodes=nodes.size();
         for(int i=1;i<nodes.size();i++) {
             Vector3 p=nodes.get(i).position(), par=nodes.get(nodes.get(i).parent()).position();
@@ -168,7 +168,7 @@ class TreeAlgorithmsTest {
         assertEquals(0, down);
     }
     @Test void pineTrunkMaterialStaysNearTheColumn() {
-        var result=new TreeBuildTask().build(TreeConfig.defaults().withPreset(TreePreset.PINE).withScale(TreeScale.GIANT),()->false);
+        var result=new TreeBuildTask().build(TreeConfig.defaults().withTreeType(TreeType.PINE).withScale(TreeScale.GIANT),()->false);
         double cap=Math.max(1.0,TreeScale.GIANT.height*.055)+2.5;
         long bark=0,far=0;
         for(var cell:result.blocks().entrySet()) {

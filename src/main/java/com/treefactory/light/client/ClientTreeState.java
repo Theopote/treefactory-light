@@ -104,12 +104,24 @@ public final class ClientTreeState {
             for(Cell cell:preview.tree().blocks().keySet()) own.add(previewOrigin.offset(cell.x(),cell.y(),cell.z()));
         Vec3 end=eye.add(dir.scale(WorldBatchPaster.PLACE_RANGE)), start=eye;
         for(int i=0;i<256;i++) {
-            var hit=mc.level.clip(new ClipContext(start,end,ClipContext.Block.OUTLINE,ClipContext.Fluid.NONE,mc.player));
-            if(hit.getType()!=HitResult.Type.BLOCK || !own.contains(hit.getBlockPos())) return hit;
-            BlockPos skipped=hit.getBlockPos();
-            start=hit.getLocation();
+            BlockHitResult hit= null;
+            if (mc.level != null) {
+                if (mc.player != null) {
+                    hit = mc.level.clip(new ClipContext(start,end,ClipContext.Block.OUTLINE,ClipContext.Fluid.NONE,mc.player));
+                }
+            }
+            if (hit != null && (hit.getType() != HitResult.Type.BLOCK || !own.contains(hit.getBlockPos()))) return hit;
+            BlockPos skipped= null;
+            if (hit != null) {
+                skipped = hit.getBlockPos();
+            }
+            if (hit != null) {
+                start=hit.getLocation();
+            }
             // Step out of the skipped block so the next clip cannot hit it again from the inside.
-            for(int s=0;s<40 && BlockPos.containing(start).equals(skipped);s++) start=start.add(dir.scale(.1));
+            if (skipped != null) {
+                for(int s=0;s<40 && BlockPos.containing(start).equals(skipped);s++) start=start.add(dir.scale(.1));
+            }
             if(BlockPos.containing(start).equals(skipped)) break;
         }
         return mc.level.clip(new ClipContext(start,end,ClipContext.Block.OUTLINE,ClipContext.Fluid.NONE,mc.player));
@@ -154,7 +166,7 @@ public final class ClientTreeState {
     public void requestFinish(Runnable onSuccess) {
         if(finish.phase()!=FinishPhase.NONE) return;
         if(!active || target==null) { toast("treefactory.aim_first"); return; }
-        if(!ClientPlayNetworking.canSend(C2SFinishTreePacket.TYPE)) { toast("treefactory.no_server"); return; }
+        if(!ClientPlayNetworking.canSend(C2SEndPreviewPacket.TYPE)) { toast("treefactory.no_server"); return; }
         boolean preparing=generating || dirty || placeDirty;
         finish.begin(onSuccess, preparing);
         if(preparing) {
@@ -165,7 +177,7 @@ public final class ClientTreeState {
     }
 
     private void sendFinishRequest() {
-        ClientPlayNetworking.send(new C2SFinishTreePacket(true, finish.send()));
+        ClientPlayNetworking.send(new C2SEndPreviewPacket(true, finish.send()));
     }
 
     public void onCommitResult(long requestId, boolean success) {
@@ -179,7 +191,7 @@ public final class ClientTreeState {
     /** Removes the unfinished preview tree from the world. */
     public void cancel() {
         finish.clear();
-        if(active && ClientPlayNetworking.canSend(C2SFinishTreePacket.TYPE)) ClientPlayNetworking.send(new C2SFinishTreePacket(false, 0));
+        if(active && ClientPlayNetworking.canSend(C2SEndPreviewPacket.TYPE)) ClientPlayNetworking.send(new C2SEndPreviewPacket(false, 0));
         active=false; target=null; placeDirty=false; previewOrigin=null;
     }
     public void undo() {
@@ -189,7 +201,7 @@ public final class ClientTreeState {
     public void cycleScale(int direction) {
         update(config.withScale(config.scale().cycle(direction)));
         var player=Minecraft.getInstance().player;
-        if(player!=null) player.sendOverlayMessage(Component.translatable("treefactory.size",String.format("%.1f",config.height())));
+        if(player!=null) player.sendOverlayMessage(Component.translatable("treefactory.trunk_height",String.format("%.1f",config.trunkHeight())));
     }
     public void refreshLibrary() {
         CompletableFuture.supplyAsync(()-> {

@@ -13,9 +13,10 @@ public final class PipeModelEngine {
      * clipped to one value, and (b) a length-based taper from the distance to the farthest tip. Both are monotone
      * along every root-to-tip path, so a child is never thicker than its parent.
      */
-    private static final double SOFT_START = .55, LENGTH_WEIGHT = .6, GAMMA = .8;
+    private static final double LENGTH_WEIGHT = .25, GAMMA = .8;
     public List<TreeNode> apply(List<TreeNode> skeleton, TreeConfig config) {
-        double cap=Math.max(1.0,config.height()*.055), e=config.pipeExponent(), t=config.trunkThickness();
+        // Expand the displayed exponent's narrow range to make branch thickness visibly adjustable.
+        double cap=Math.max(1.0,config.trunkHeight()*.055), e=2.75+(config.pipeExponent()-2.75)*8.6, t=config.trunkThickness();
         int n=skeleton.size();
         double[] sums=new double[n], raw=new double[n]; int[] h=new int[n];
         for (int i=n-1;i>=0;i--) {
@@ -24,10 +25,10 @@ public final class PipeModelEngine {
             raw[i]= sums[i]==0 ? .5 : Math.pow(sums[i],1/e);
             if (node.parent()>=0) { sums[node.parent()]+=Math.pow(raw[i],e); h[node.parent()]=Math.max(h[node.parent()],h[i]+1); }
         }
-        double r0=SOFT_START*cap, span=cap-r0, hRoot=Math.max(1,h[0]);
+        double span=cap-.5, hRoot=Math.max(1,h[0]);
         double[] fin=new double[n]; List<TreeNode> out=new ArrayList<>(skeleton);
         for (int i=0;i<n;i++) {
-            double pipe = raw[i]<=r0 ? raw[i] : r0+span*Math.tanh((raw[i]-r0)/span);
+            double pipe = .5+span*(1-Math.exp(-.5*(raw[i]-.5)/span));
             double len  = .5+(cap-.5)*Math.pow(h[i]/hRoot,GAMMA);
             double r = (1-LENGTH_WEIGHT)*pipe + LENGTH_WEIGHT*len;
             TreeNode node=skeleton.get(i);

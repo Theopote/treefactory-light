@@ -14,10 +14,10 @@ class CrownStretchTest {
             if (!shape.stretchable()) continue;
             TreeConfig base = TreeConfig.defaults().withCanopy(shape, 1.4, 1.2).withSeed(8848123L).withCrownStretch(1.0);
             TreeConfig stretched = base.withCrownStretch(2.0);
-            double baseMin = minCrownY(colonizer.generate(base), base.height());
-            double stretchMin = minCrownY(colonizer.generate(stretched), stretched.height());
+            double baseMin = minCrownY(colonizer.generate(base), base.trunkHeight());
+            double stretchMin = minCrownY(colonizer.generate(stretched), stretched.trunkHeight());
             assertEquals(baseMin, stretchMin, 1.5, shape.name());
-            assertTrue(maxCrownY(colonizer.generate(stretched), stretched.height()) > maxCrownY(colonizer.generate(base), base.height()),
+            assertTrue(maxCrownY(colonizer.generate(stretched), stretched.trunkHeight()) > maxCrownY(colonizer.generate(base), base.trunkHeight()),
                     shape.name());
         }
     }

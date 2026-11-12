@@ -1,7 +1,7 @@
 package com.treefactory.light.core.algorithm;
 
 import com.treefactory.light.core.config.TreeConfig;
-import com.treefactory.light.core.config.TreePreset;
+import com.treefactory.light.core.config.TreeType;
 
 /** Maps internal morphology sliders to branch growth vectors. */
 public final class BranchMorphology {
@@ -10,17 +10,16 @@ public final class BranchMorphology {
     public record GrowthBias(double yBias, double inertiaWeight, boolean allowDownward) {}
 
     public static GrowthBias growthBias(TreeConfig config) {
-        boolean willow = config.preset() == TreePreset.WILLOW;
+        boolean willow = config.treeType() == TreeType.WILLOW;
         double yBias = 0.14 + 0.28 * (TreeConfig.DEFAULT_BRANCH_ANGLE_BIAS - config.branchAngleBias())
                 - config.branchDroop() * 0.35 - (config.gravityInfluence() - 0.5) * 2.4;
         if (willow) yBias -= 0.05;
         double inertia = 0.6 + config.apicalDominance() * 0.8;
-        // Keep the 1.2 downward-growth threshold when older gravity values are converted.
-        boolean allowDown = willow || config.branchDroop() > 0.4 || config.gravityInfluence() > (0.5 + 0.4 / 3.0);
+        boolean allowDown = willow || yBias < 0;
         return new GrowthBias(yBias, inertia, allowDown);
     }
 
     public static boolean growsPropRoots(TreeConfig config) {
-        return config.branchDroop() >= 0.65 && config.spread() >= 0.55;
+        return config.branchDroop() >= 0.65;
     }
 }

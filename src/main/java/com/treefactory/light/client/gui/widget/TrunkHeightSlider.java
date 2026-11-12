@@ -7,17 +7,17 @@ import net.minecraft.network.chat.Component;
 import java.util.function.DoubleConsumer;
 
 /** Continuous trunk-height slider. */
-public final class ScaleSlider extends AbstractSliderButton {
+public final class TrunkHeightSlider extends AbstractSliderButton {
     private static final double MIN=TreeConfig.MIN_HEIGHT, MAX=TreeConfig.MAX_HEIGHT;
     private final DoubleConsumer changed;
-    public ScaleSlider(int x,int y,int width,double height,DoubleConsumer changed) {
+    public TrunkHeightSlider(int x,int y,int width,double height,DoubleConsumer changed) {
         super(x,y,width,14,Component.empty(),(height-MIN)/(MAX-MIN));
         this.changed=changed; updateMessage();
-        setTooltip(Tooltip.create(Component.translatable("treefactory.size.tip")));
+        setTooltip(Tooltip.create(Component.translatable("treefactory.trunk_height.tip")));
     }
     private double height() { return MIN+value*(MAX-MIN); }
     @Override protected void updateMessage() {
-        setMessage(Component.translatable("treefactory.size",String.format("%.1f",height())));
+        setMessage(Component.translatable("treefactory.trunk_height",String.format("%.1f",height())));
     }
     @Override protected void applyValue() { updateMessage(); changed.accept(height()); }
 }

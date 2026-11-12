@@ -38,7 +38,7 @@ class TrunkThicknessTest {
                 .withCanopy(CanopyShape.CONE, 2.0, 2.0)
                 .withTrunkThickness(2.0)
                 .withCrownStretch(2.0)
-                .withDna(1, 1, 1);
+                .withParameters(1, 1, 1);
         var result = new TreeBuildTask().build(config, () -> false);
         assertTrue(result.blocks().size() <= Voxelizer.MAX_BLOCKS);
         assertTrue(result.blocks().values().stream().anyMatch(Voxelizer.Material::woody));

@@ -126,13 +126,13 @@ public final class DrawerScreen extends Screen {
 
         addContent(new SectionLabel(M, y - scroll, w, "treefactory.section.structure"));
         y += 16;
-        addContent(new ScaleSlider(M, y - scroll, w, c.height(), h -> state.update(state.config().withHeight(h))));
+        addContent(new TrunkHeightSlider(M, y - scroll, w, c.trunkHeight(), h -> state.update(state.config().withTrunkHeight(h))));
         y += 18;
-        addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.trunk_thickness", normalize(c.trunkThickness(),TreeConfig.MIN_THICKNESS,TreeConfig.MAX_THICKNESS),
+        addContent(new ParamSlider(M, y - scroll, w, "treefactory.trunk_thickness", normalize(c.trunkThickness(),TreeConfig.MIN_THICKNESS,TreeConfig.MAX_THICKNESS),
                 v -> state.update(state.config().withTrunkThickness(interpolate(v,TreeConfig.MIN_THICKNESS,TreeConfig.MAX_THICKNESS)))));
         y += 16;
-        addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.crookedness", c.crookedness(),
-                v -> state.update(state.config().withDna(v, state.config().spread(), state.config().fullness()))));
+        addContent(new ParamSlider(M, y - scroll, w, "treefactory.crookedness", c.crookedness(),
+                v -> state.update(state.config().withParameters(v, state.config().spread(), state.config().fullness()))));
         y += 18;
 
         addContent(new SectionLabel(M, y - scroll, w, "treefactory.section.canopy"));
@@ -145,44 +145,44 @@ public final class DrawerScreen extends Screen {
         addContent(shapeGrid);
         y += shapeGrid.getHeight() + 4;
 
-        addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.canopy_size", normalize(c.canopyScale(),TreeConfig.MIN_CANOPY_SCALE,TreeConfig.MAX_CANOPY_SCALE),
+        addContent(new ParamSlider(M, y - scroll, w, "treefactory.canopy_size", normalize(c.canopyScale(),TreeConfig.MIN_CANOPY_SCALE,TreeConfig.MAX_CANOPY_SCALE),
                 v -> {
                     TreeConfig now = state.config();
                     state.update(now.withCanopy(now.canopyShape(), interpolate(v,TreeConfig.MIN_CANOPY_SCALE,TreeConfig.MAX_CANOPY_SCALE), now.attractionDensity()));
                 }));
         y += 16;
-        addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.crown_base",
+        addContent(new ParamSlider(M, y - scroll, w, "treefactory.crown_base",
                 (c.crownBase() - TreeConfig.MIN_CROWN_BASE) / (TreeConfig.MAX_CROWN_BASE - TreeConfig.MIN_CROWN_BASE),
                 v -> state.update(state.config().withCrownBase(TreeConfig.MIN_CROWN_BASE
                         + (TreeConfig.MAX_CROWN_BASE - TreeConfig.MIN_CROWN_BASE) * v))));
                                 y += 16;
-        addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.spread", c.spread(),
-                v -> state.update(state.config().withDna(state.config().crookedness(), v, state.config().fullness()))));
+        addContent(new ParamSlider(M, y - scroll, w, "treefactory.spread", c.spread(),
+                v -> state.update(state.config().withParameters(state.config().crookedness(), v, state.config().fullness()))));
                                 y += 16;
-        addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.fullness", c.fullness(),
-                v -> state.update(state.config().withDna(state.config().crookedness(), state.config().spread(), v))));
+        addContent(new ParamSlider(M, y - scroll, w, "treefactory.fullness", c.fullness(),
+                v -> state.update(state.config().withParameters(state.config().crookedness(), state.config().spread(), v))));
                                 y += 16;
         if (c.canopyShape().stretchable()) {
-            addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.crown_stretch", normalize(c.crownStretch(),TreeConfig.MIN_STRETCH,TreeConfig.MAX_STRETCH),
+            addContent(new ParamSlider(M, y - scroll, w, "treefactory.crown_stretch", normalize(c.crownStretch(),TreeConfig.MIN_STRETCH,TreeConfig.MAX_STRETCH),
                         v -> state.update(state.config().withCrownStretch(interpolate(v,TreeConfig.MIN_STRETCH,TreeConfig.MAX_STRETCH)))));
                                 y += 16;
         }
         if (c.canopyShape().layered()) {
-            addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.crown_layers", normalize(c.crownLayers(),TreeConfig.MIN_LAYERS,TreeConfig.MAX_LAYERS),
+            addContent(new ParamSlider(M, y - scroll, w, "treefactory.crown_layers", normalize(c.crownLayers(),TreeConfig.MIN_LAYERS,TreeConfig.MAX_LAYERS),
                     v -> state.update(state.config().withCrownLayers((int) Math.round(interpolate(v,TreeConfig.MIN_LAYERS,TreeConfig.MAX_LAYERS))))));
                                 y += 16;
         }
 
-        addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.attraction_density", normalize(c.attractionDensity(),TreeConfig.MIN_DENSITY,TreeConfig.MAX_DENSITY),
+        addContent(new ParamSlider(M, y - scroll, w, "treefactory.attraction_density", normalize(c.attractionDensity(),TreeConfig.MIN_DENSITY,TreeConfig.MAX_DENSITY),
                 v -> {
                     TreeConfig now = state.config();
                     state.update(now.withCanopy(now.canopyShape(), now.canopyScale(), interpolate(v,TreeConfig.MIN_DENSITY,TreeConfig.MAX_DENSITY)));
                 }));
         y += 16;
-        addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.pipe_exponent", normalize(c.pipeExponent(),TreeConfig.MIN_PIPE_EXPONENT,TreeConfig.MAX_PIPE_EXPONENT),
+        addContent(new ParamSlider(M, y - scroll, w, "treefactory.pipe_exponent", normalize(c.pipeExponent(),TreeConfig.MIN_PIPE_EXPONENT,TreeConfig.MAX_PIPE_EXPONENT),
                 v -> state.update(state.config().withPipeExponent(interpolate(v,TreeConfig.MIN_PIPE_EXPONENT,TreeConfig.MAX_PIPE_EXPONENT)))));
         y += 16;
-        addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.gravity_influence", c.gravityInfluence(),
+        addContent(new ParamSlider(M, y - scroll, w, "treefactory.gravity_influence", c.gravityInfluence(),
                 v -> state.update(state.config().withGravityInfluence(v))));
         y += 16;
 
@@ -245,7 +245,7 @@ public final class DrawerScreen extends Screen {
     }
 
     @Override
-    public Optional<GuiEventListener> getChildAt(double x, double y) {
+    public @NonNull Optional<GuiEventListener> getChildAt(double x, double y) {
         return children().stream()
                 .filter(child -> !content.contains(child) || (y >= TOP && y < bottom()))
                 .filter(child -> child.isMouseOver(x, y))

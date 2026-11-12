@@ -62,7 +62,7 @@ public final class Voxelizer {
             parents[node.parent()] = true;
             TreeNode parent = nodes.get(node.parent());
             double radius=Math.max(parent.radius(),node.radius());
-            if (config.preset()==TreePreset.WILLOW && config.fullness()>0
+            if (config.treeType()==TreeType.WILLOW && config.fullness()>0
                     && isDroopDrop(node,parent) && droopDepth(nodes,node)>=2) {
                 double leafRadius=Math.max(radius,.9);
                 fill(acc,parent.position(),node.position(),leafRadius,leafRadius,
@@ -75,12 +75,12 @@ public final class Voxelizer {
             fill(acc,parent.position(),node.position(),parent.radius(),node.radius(),wood,axis,cancelled,config.seed(),config.blockPalette());
             connectSpine(acc,parent.position(),node.position(),wood,axis);
         }
-        if (config.preset() != TreePreset.DEAD && config.fullness()>0) {
+        if (config.treeType() != TreeType.DEAD && config.fullness()>0) {
             double radius = 1.2+config.fullness()*1.8;
             for (int i=0; i<nodes.size(); i++) if (!parents[i]) {
                 Vector3 p = nodes.get(i).position();
                 double leafRadius=radius*(.72+.5*tipHash(i,config.seed()));
-                if (config.preset()==TreePreset.WILLOW && nodes.get(i).parent()>=0
+                if (config.treeType()==TreeType.WILLOW && nodes.get(i).parent()>=0
                         && p.y()<nodes.get(nodes.get(i).parent()).position().y())
                     leafRadius*=.45;
                 fill(acc,p,p,leafRadius,leafRadius,Material.PRIMARY_LEAF,Axis.Y,cancelled,config.seed(),config.blockPalette());

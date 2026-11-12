@@ -45,7 +45,7 @@ public final class WorldBatchPaster {
     /** Farthest distance, in blocks, at which a preview tree may be placed; the client ray uses the same limit. */
     public static final int PLACE_RANGE = 512;
     private record CommittedTree(String dimension, Map<BlockPos,BlockState> placed, Map<BlockPos,BlockState> original) {}
-    private record PreviewSnapshot(UUID player, String dimension, boolean closing,
+    private record PersistedPreview(UUID player, String dimension, boolean closing,
                                     Map<BlockPos,BlockState> placed, Map<BlockPos,BlockState> original) {}
     private static final class Session extends PreviewFootprint<BlockPos,BlockState> {
         final ServerLevel level;
@@ -55,7 +55,7 @@ public final class WorldBatchPaster {
     private record DeferredSession(UUID player, Session session) {}
     private record PendingChunk(ServerLevel level, ChunkPos pos) {}
     private record Request(BlockPos origin, TreeConfig config, long revision) {}
-    private record DiskSnapshot(List<PreviewSnapshot> previews, Map<UUID,List<CommittedTree>> undo, Path target) {}
+    private record DiskSnapshot(List<PersistedPreview> previews, Map<UUID,List<CommittedTree>> undo, Path target) {}
     private final Map<UUID,AtomicBoolean> pending = new HashMap<>();
     private final Map<UUID,Session> sessions = new HashMap<>();
     private final List<DeferredSession> deferredSessions = new ArrayList<>();
@@ -479,23 +479,23 @@ public final class WorldBatchPaster {
         });
     }
     private DiskSnapshot captureDiskSnapshot() {
-        List<PreviewSnapshot> previews=new ArrayList<>();
-        sessions.forEach((id,session) -> previews.add(new PreviewSnapshot(id,
+        List<PersistedPreview> previews=new ArrayList<>();
+        sessions.forEach((id,session) -> previews.add(new PersistedPreview(id,
                 session.level.dimension().identifier().toString(), session.closing,
                 Map.copyOf(session.placed), Map.copyOf(session.original))));
         deferredSessions.forEach(deferred -> {
             Session session=deferred.session();
-            previews.add(new PreviewSnapshot(deferred.player(), session.level.dimension().identifier().toString(), true,
+            previews.add(new PersistedPreview(deferred.player(), session.level.dimension().identifier().toString(), true,
                     Map.copyOf(session.placed), Map.copyOf(session.original)));
         });
         Map<UUID,List<CommittedTree>> undoSnapshot=new LinkedHashMap<>();
         undo.forEach((id,stack) -> undoSnapshot.put(id, List.copyOf(stack)));
         return new DiskSnapshot(previews, undoSnapshot, dataFile());
     }
-    private static void writeToDisk(List<PreviewSnapshot> previews, Map<UUID,List<CommittedTree>> undoSnapshot, Path target) throws IOException {
+    private static void writeToDisk(List<PersistedPreview> previews, Map<UUID,List<CommittedTree>> undoSnapshot, Path target) throws IOException {
         CompoundTag root=new CompoundTag();
         ListTag previewsTag=new ListTag();
-        for (PreviewSnapshot snapshot : previews) {
+        for (PersistedPreview snapshot : previews) {
             CompoundTag tag=new CompoundTag();
             tag.putString("player", snapshot.player().toString());
             tag.putString("dimension", snapshot.dimension());

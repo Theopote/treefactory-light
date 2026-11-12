@@ -37,21 +37,21 @@ public class TreefactoryLight implements ModInitializer {
 		Registry.register(BuiltInRegistries.ITEM,id("tree_wand"),TREE_WAND);
 		CreativeModeTabEvents.modifyOutputEvent(CreativeModeTabs.TOOLS_AND_UTILITIES).register(output -> output.accept(TREE_WAND));
 		PayloadTypeRegistry.serverboundPlay().register(C2SPreviewTreePacket.TYPE,C2SPreviewTreePacket.CODEC);
-		PayloadTypeRegistry.serverboundPlay().register(C2SFinishTreePacket.TYPE,C2SFinishTreePacket.CODEC);
+		PayloadTypeRegistry.serverboundPlay().register(C2SEndPreviewPacket.TYPE,C2SEndPreviewPacket.CODEC);
 		PayloadTypeRegistry.serverboundPlay().register(C2SUndoTreePacket.TYPE,C2SUndoTreePacket.CODEC);
 		PayloadTypeRegistry.clientboundPlay().register(S2CTreeCommitResultPacket.TYPE,S2CTreeCommitResultPacket.CODEC);
 		PASTER.setCommitNotifier((player, requestId, success) ->
 				ServerPlayNetworking.send(player, new S2CTreeCommitResultPacket(requestId, success)));
 		ServerPlayNetworking.registerGlobalReceiver(C2SPreviewTreePacket.TYPE,(packet,context) ->
 				context.server().execute(() -> PASTER.preview(context.player(),packet.origin(),packet.config())));
-		ServerPlayNetworking.registerGlobalReceiver(C2SFinishTreePacket.TYPE,(packet,context) ->
+		ServerPlayNetworking.registerGlobalReceiver(C2SEndPreviewPacket.TYPE,(packet,context) ->
 				context.server().execute(() -> {
 					if (packet.commit()) PASTER.requestCommit(context.player(), packet.requestId()); else PASTER.discard(context.player().getUUID());
 				}));
 		ServerPlayNetworking.registerGlobalReceiver(C2SUndoTreePacket.TYPE,(packet,context) ->
 				context.server().execute(() -> PASTER.undo(context.player())));
 		ServerPlayConnectionEvents.DISCONNECT.register((handler,server) -> PASTER.disconnect(handler.player.getUUID()));
-		ServerLifecycleEvents.SERVER_STARTED.register(server -> PASTER.attach(server));
+		ServerLifecycleEvents.SERVER_STARTED.register(PASTER::attach);
 		ServerLifecycleEvents.SERVER_STOPPING.register(server -> PASTER.stop());
 		ServerTickEvents.END_SERVER_TICK.register(server -> PASTER.tick());
 		ServerChunkEvents.CHUNK_LOAD.register((level,chunk,generated) -> PASTER.chunkLoaded(level, chunk.getPos()));

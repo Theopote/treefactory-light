@@ -16,14 +16,14 @@ public final class SpaceColonizer {
     public List<TreeNode> generate(TreeConfig config, BooleanSupplier cancelled) {
         Random random = new Random(config.seed());
         NoiseGenerator noise = new NoiseGenerator(config.seed());
-        double height = config.height();
+        double height = config.trunkHeight();
         double width = height * (.22 + .38 * config.spread()) * config.canopyScale();
         double vertical = config.crownVerticalScale(), crownCenter = config.crownCenterHeight();
         double leanAngle = random.nextDouble()*Math.PI*2;
         double leanMag = height*.05*(.3+config.crookedness()*1.4);
         double crownDX = Math.cos(leanAngle)*leanMag*1.5, crownDZ = Math.sin(leanAngle)*leanMag*1.5;
         List<Vector3> attractors = new ArrayList<>();
-        int count = Math.min(1500,(int)((180 + 400 * config.fullness()) * config.attractionDensity()));
+        int count = Math.min(1500,(int)(500 * config.attractionDensity()));
         for (int i = 0; i < count; i++) {
             if (cancelled.getAsBoolean() || Thread.currentThread().isInterrupted()) throw new CancellationException();
             double x, y, z;
@@ -105,7 +105,7 @@ public final class SpaceColonizer {
             if (nodes.size() == before) break;
         }
         if (BranchMorphology.growsPropRoots(config)) addPropRoots(nodes, occupied, config, random, cancelled);
-        if (config.preset() == TreePreset.WILLOW) {
+        if (config.treeType() == TreeType.WILLOW) {
             boolean[] parent = new boolean[nodes.size()];
             for (TreeNode n : nodes) if (n.parent() >= 0) parent[n.parent()] = true;
             int before = nodes.size();
@@ -129,7 +129,7 @@ public final class SpaceColonizer {
     /** Mangrove-like presets: diagonal stilt roots from the lower trunk. */
     private static void addPropRoots(List<TreeNode> nodes, Set<Cell> occupied, TreeConfig config, Random random,
                                      BooleanSupplier cancelled) {
-        int maxTrunk = Math.min(1 + config.trunkSegments(), (int)(config.height() * 0.15) + 2);
+        int maxTrunk = Math.min(1 + config.trunkSegments(), (int)(config.trunkHeight() * 0.15) + 2);
         if (maxTrunk < 2) return;
         int roots = 4 + random.nextInt(3);
         for (int r = 0; r < roots && nodes.size() < MAX_NODES; r++) {
@@ -137,9 +137,9 @@ public final class SpaceColonizer {
             int anchor = 1 + random.nextInt(maxTrunk - 1);
             double angle = random.nextDouble() * Math.PI * 2;
             double down = 0.35 + config.branchDroop() * 0.45;
-            double out = 0.45 + config.spread() * 0.75;
+            double out = 0.9;
             int parent = anchor;
-            int steps = 3 + (int)(config.height() * 0.07);
+            int steps = 3 + (int)(config.trunkHeight() * 0.07);
             for (int step = 0; step < steps && nodes.size() < MAX_NODES; step++) {
                 check(cancelled);
                 Vector3 base = nodes.get(parent).position();

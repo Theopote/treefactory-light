@@ -26,12 +26,12 @@ class CrownPositionTest {
     @Test void shiftsCrownAndBranchBaseForEveryShape() {
         SpaceColonizer colonizer = new SpaceColonizer();
         for (CanopyShape shape : CanopyShape.values()) {
-            TreeConfig config = TreeConfig.defaults().withHeight(24).withCanopy(shape, 1.25, 1.25);
+            TreeConfig config = TreeConfig.defaults().withTrunkHeight(24).withCanopy(shape, 1.25, 1.25);
             double[] bottoms = new double[3], tops = new double[3];
             int index = 0;
             for (double offset : new double[] {.1, .3, .7}) {
                 TreeConfig moved = config.withCrownBase(offset);
-                assertEquals(offset * moved.height(),
+                assertEquals(offset * moved.trunkHeight(),
                         moved.crownCenterHeight() + shape.crownMinY(moved.crownLayers()) * moved.crownVerticalScale(), 1e-9, shape.name());
                 List<TreeNode> nodes = colonizer.generate(moved);
                 int trunkNodes = 1 + moved.trunkSegments();
@@ -51,18 +51,18 @@ class CrownPositionTest {
         assertThrows(IllegalArgumentException.class, () -> config.withCrownBase(.09));
         assertThrows(IllegalArgumentException.class, () -> config.withCrownBase(.71));
         assertThrows(IllegalArgumentException.class, () -> config.withCrownBase(Double.NaN));
-        TreeConfig updated = config.withSeed(1).withHeight(32).withScale(TreeScale.LARGE)
-                .withDna(.2, .4, .6).withCanopy(CanopyShape.SPHERE, 1.1, 1)
+        TreeConfig updated = config.withSeed(1).withTrunkHeight(32).withScale(TreeScale.LARGE)
+                .withParameters(.2, .4, .6).withCanopy(CanopyShape.SPHERE, 1.1, 1)
                 .withTrunkThickness(1.2).withCrownStretch(1.3).withCrownLayers(4)
                 .withPipeExponent(2.6).withGravityInfluence(.8)
-                .withMorphology(.1, .2, .3).withBlockPalette(config.blockPalette()).withPreset(TreePreset.PINE);
+                .withMorphology(.1, .2, .3).withBlockPalette(config.blockPalette()).withTreeType(TreeType.PINE);
         assertEquals(.15, updated.crownBase());
         assertEquals(config, PresetStore.decode("id", PresetStore.encode("Tree", "Player", config)).config());
     }
 
     @Test void legacyPresetConvertsOriginalCrownPosition() {
-        var root = com.google.gson.JsonParser.parseString(PresetStore.encode("Tree", "Player",
-                TreeConfig.defaults().withCrownBase(.2))).getAsJsonObject();
+        var root = PresetStoreTest.legacyRoot(PresetStore.encode("Tree", "Player",
+                TreeConfig.defaults().withCrownBase(.2)));
         root.addProperty("version", "1.3");
         root.getAsJsonObject("canopy").remove("crown_offset");
         TreeConfig decoded = PresetStore.decode("id", root.toString()).config();
@@ -71,14 +71,16 @@ class CrownPositionTest {
 
     @Test void legacyOffsetsAreConvertedAndClampedForDifferentShapes() {
         for (CanopyShape shape : CanopyShape.values()) {
-            TreeConfig config = TreeConfig.defaults().withHeight(24).withCanopy(shape, 1.25, 1.25).withCrownStretch(1.4);
+            TreeConfig config = TreeConfig.defaults().withTrunkHeight(24).withCanopy(shape, 1.25, 1.25).withCrownStretch(1.4);
             for (double offset : new double[] {-.2, 0, .2}) {
-                var root = com.google.gson.JsonParser.parseString(PresetStore.encode("Tree", "Player", config)).getAsJsonObject();
+                var root = PresetStoreTest.legacyRoot(PresetStore.encode("Tree", "Player", config));
                 root.addProperty("version", "1.4");
                 var canopy = root.getAsJsonObject("canopy");
                 canopy.remove("crown_base");
                 canopy.addProperty("crown_offset", offset);
-                double height = config.height(), vertical = config.crownVerticalScale();
+                double height = config.trunkHeight(), vertical = shape == CanopyShape.SPHERE
+                        ? height*(.22+.38*config.spread())*config.canopyScale()
+                        : config.crownVerticalScale();
                 double oldCenter = shape == CanopyShape.SPHERE ? Math.max(.76 * height, vertical + 2)
                         : .76 * height - shape.minY(config.crownLayers()) * height * .38
                         * config.canopyScale() * (config.crownStretch() - 1);
@@ -92,7 +94,7 @@ class CrownPositionTest {
     @Test void trunkReachesConfiguredHeightAndBranchesStartAtCrownBase() {
         SpaceColonizer colonizer = new SpaceColonizer();
         for (double height : new double[] {6, 16.4, 48}) for (double base : new double[] {.1, .3, .7}) {
-            TreeConfig config = TreeConfig.defaults().withHeight(height).withCrownBase(base);
+            TreeConfig config = TreeConfig.defaults().withTrunkHeight(height).withCrownBase(base);
             List<TreeNode> nodes = colonizer.generate(config);
             int segments = config.trunkSegments();
             assertEquals(height, nodes.get(segments).position().y() - nodes.getFirst().position().y(), 1e-9);
@@ -111,7 +113,7 @@ class CrownPositionTest {
 
     @Test void versionOnePointFivePresetsAreClampedToNewRange() {
         for (double base : new double[] {0, .05, .2, .5}) {
-            var root = com.google.gson.JsonParser.parseString(PresetStore.encode("Tree", "Player", TreeConfig.defaults())).getAsJsonObject();
+            var root = PresetStoreTest.legacyRoot(PresetStore.encode("Tree", "Player", TreeConfig.defaults()));
             root.addProperty("version", "1.5");
             root.getAsJsonObject("canopy").addProperty("crown_base", base);
             assertEquals(Math.max(.1,base),PresetStore.decode("old",root.toString()).config().crownBase());
@@ -119,7 +121,7 @@ class CrownPositionTest {
     }
 
     @Test void generatedTrunkUsesTrunkMaterialAlongEntireHeight() {
-        TreeConfig config = TreeConfig.defaults().withHeight(20).withCrownBase(.3);
+        TreeConfig config = TreeConfig.defaults().withTrunkHeight(20).withCrownBase(.3);
         TreeBuildTask.Result tree = new TreeBuildTask().build(config, () -> false);
         for (int i=1; i<=config.trunkSegments(); i++) {
             var p=tree.nodes().get(i).position();

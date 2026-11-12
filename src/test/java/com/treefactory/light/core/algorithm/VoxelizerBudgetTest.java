@@ -26,7 +26,7 @@ class VoxelizerBudgetTest {
         TreeConfig config = TreeConfig.defaults()
                 .withScale(TreeScale.GIANT)
                 .withCanopy(CanopyShape.SPHERE, 2, 2)
-                .withDna(1, 1, 1)
+                .withParameters(1, 1, 1)
                 .withTrunkThickness(2);
         var result = new TreeBuildTask().build(config, () -> false);
         assertTrue(result.blocks().size() <= Voxelizer.MAX_BLOCKS);

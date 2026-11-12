@@ -14,7 +14,7 @@ public final class PresetStore {
     public PresetStore(Path directory) { this.directory = directory; }
     public Path thumbnail(String id) {
         if (!id.matches("[a-zA-Z0-9_-]+")) throw new IllegalArgumentException("Invalid preset id");
-        return directory.resolve(id + "-v3.png");
+        return directory.resolve(id + "-v4.png");
     }
     public Preset save(String name, String author, TreeConfig config) throws IOException {
         if (name == null || name.isBlank() || name.length()>64) throw new IllegalArgumentException("Name must contain 1–64 characters");
@@ -58,17 +58,19 @@ public final class PresetStore {
     }
     public static String encode(String name, String author, TreeConfig c) {
         JsonObject root = new JsonObject();
-        root.addProperty("name",name); root.addProperty("author",author); root.addProperty("version","1.6");
-        root.addProperty("preset_type",c.preset().id()); root.addProperty("scale",c.scale().id()); root.addProperty("height",c.height()); root.addProperty("seed",c.seed());
+        root.addProperty("name",name); root.addProperty("author",author); root.addProperty("version","1.7");
+        root.addProperty("tree_type",c.treeType().id()); root.addProperty("trunk_height",c.trunkHeight()); root.addProperty("seed",c.seed());
         JsonObject dna = new JsonObject();
         dna.addProperty("crookedness",c.crookedness()); dna.addProperty("spread",c.spread()); dna.addProperty("fullness",c.fullness());
         root.add("dna",dna);
         JsonObject canopy=new JsonObject();
         canopy.addProperty("shape",c.canopyShape().name().toLowerCase(Locale.ROOT));
         canopy.addProperty("scale",c.canopyScale()); canopy.addProperty("density",c.attractionDensity());
-        canopy.addProperty("pipe_exponent",c.pipeExponent()); canopy.addProperty("trunk_thickness",c.trunkThickness());
         canopy.addProperty("crown_stretch",c.crownStretch()); canopy.addProperty("crown_layers",c.crownLayers());
         canopy.addProperty("crown_base",c.crownBase()); root.add("canopy",canopy);
+        JsonObject structure=new JsonObject();
+        structure.addProperty("pipe_exponent",c.pipeExponent()); structure.addProperty("trunk_thickness",c.trunkThickness());
+        root.add("structure",structure);
         JsonObject morphology=new JsonObject();
         morphology.addProperty("branch_angle_bias",c.branchAngleBias());
         morphology.addProperty("branch_droop",c.branchDroop());
@@ -88,13 +90,14 @@ public final class PresetStore {
         if (json.length()>16384) throw new IllegalArgumentException("Preset too large");
         JsonObject root = JsonParser.parseString(json).getAsJsonObject();
         String version=root.get("version").getAsString();
-        if (!"1.0".equals(version) && !"1.1".equals(version) && !"1.2".equals(version) && !"1.3".equals(version) && !"1.4".equals(version) && !"1.5".equals(version) && !"1.6".equals(version)) throw new IllegalArgumentException("Unsupported preset version");
+        if (!Set.of("1.0","1.1","1.2","1.3","1.4","1.5","1.6","1.7").contains(version)) throw new IllegalArgumentException("Unsupported preset version");
         String name = root.get("name").getAsString(), author = root.get("author").getAsString();
         if (name.isBlank() || name.length()>64 || author.length()>64) throw new IllegalArgumentException("Invalid preset metadata");
         JsonObject dna = root.getAsJsonObject("dna"), palette = root.getAsJsonObject("palette");
-        TreePreset type=TreePreset.valueOf(root.get("preset_type").getAsString().toUpperCase(Locale.ROOT));
+        boolean current="1.7".equals(version);
+        TreeType type=TreeType.valueOf(root.get(current?"tree_type":"preset_type").getAsString().toUpperCase(Locale.ROOT));
         TreeConfig legacy = new TreeConfig(type,
-                TreeScale.valueOf(root.get("scale").getAsString().toUpperCase(Locale.ROOT)),root.get("seed").getAsLong(),
+                current ? TreeScale.MEDIUM : TreeScale.valueOf(root.get("scale").getAsString().toUpperCase(Locale.ROOT)),root.get("seed").getAsLong(),
                 dna.get("crookedness").getAsDouble(),dna.get("spread").getAsDouble(),dna.get("fullness").getAsDouble(),
                 palette.get("log_block").getAsString(),palette.get("leaves_block").getAsString());
         if("1.0".equals(version)) return new Preset(id,name,author,legacy.withCrownBase(legacyCrownBase(legacy,0)));
@@ -103,7 +106,8 @@ public final class PresetStore {
                 palette.get("thin_branch").getAsString(),legacy.leavesBlock(),palette.get("secondary_leaf").getAsString(),
                 palette.get("accent_block").getAsString(),palette.get("primary_weight").getAsDouble(),
                 palette.get("secondary_weight").getAsDouble(),palette.get("accent_weight").getAsDouble());
-        double height=root.has("height")?root.get("height").getAsDouble():legacy.height();
+        double height=current ? root.get("trunk_height").getAsDouble() : root.has("height")?root.get("height").getAsDouble():legacy.trunkHeight();
+        JsonObject structure=current ? root.getAsJsonObject("structure") : canopy;
         JsonObject morphology=root.has("morphology")?root.getAsJsonObject("morphology"):null;
         double angleBias=morphology!=null && morphology.has("branch_angle_bias")?morphology.get("branch_angle_bias").getAsDouble():TreeConfig.DEFAULT_BRANCH_ANGLE_BIAS;
         double droop=morphology!=null && morphology.has("branch_droop")?morphology.get("branch_droop").getAsDouble():TreeConfig.DEFAULT_BRANCH_DROOP;
@@ -116,11 +120,11 @@ public final class PresetStore {
         }
         TreeConfig config=new TreeConfig(type,legacy.scale(),legacy.seed(),legacy.crookedness(),legacy.spread(),legacy.fullness(),
                 CanopyShape.valueOf(canopy.get("shape").getAsString().toUpperCase(Locale.ROOT)),canopy.get("scale").getAsDouble(),
-                canopy.get("density").getAsDouble(),canopy.get("pipe_exponent").getAsDouble(),blocks,height,
-                canopy.has("trunk_thickness")?canopy.get("trunk_thickness").getAsDouble():1.0,
+                canopy.get("density").getAsDouble(),structure.get("pipe_exponent").getAsDouble(),blocks,height,
+                structure.has("trunk_thickness")?structure.get("trunk_thickness").getAsDouble():1.0,
                 canopy.has("crown_stretch")?canopy.get("crown_stretch").getAsDouble():1.0,
                 canopy.has("crown_layers")?canopy.get("crown_layers").getAsInt():3,angleBias,droop,apical,gravity);
-        if ("1.6".equals(version)) {
+        if ("1.6".equals(version) || current) {
             config=config.withCrownBase(canopy.get("crown_base").getAsDouble());
         } else if ("1.5".equals(version)) {
             double base=canopy.get("crown_base").getAsDouble();
@@ -135,8 +139,10 @@ public final class PresetStore {
         return new Preset(id,name,author,config);
     }
     private static double legacyCrownBase(TreeConfig config, double offset) {
-        double height=config.height();
-        double vertical=config.crownVerticalScale();
+        double height=config.trunkHeight();
+        double vertical=config.canopyShape()==CanopyShape.SPHERE
+                ? height*(.22+.38*config.spread())*config.canopyScale()
+                : height*.38*config.canopyScale()*config.crownStretch();
         double center;
         if (config.canopyShape()==CanopyShape.SPHERE) {
             center=Math.max(height*.76,vertical+2);

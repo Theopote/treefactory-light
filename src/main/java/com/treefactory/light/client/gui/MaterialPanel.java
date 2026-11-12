@@ -1,9 +1,9 @@
 package com.treefactory.light.client.gui;
 
 import com.treefactory.light.client.ClientTreeState;
-import com.treefactory.light.client.gui.widget.DNAControlSlider;
+import com.treefactory.light.client.gui.widget.ParamSlider;
 import com.treefactory.light.core.config.BlockPalette;
-import com.treefactory.light.core.config.TreePreset;
+import com.treefactory.light.core.config.TreeType;
 import com.treefactory.light.util.PaletteRules;
 import com.treefactory.light.util.PaletteRules.Role;
 import net.minecraft.client.gui.Font;
@@ -46,7 +46,7 @@ final class MaterialPanel {
     private Role cachedRole;
     private String cachedQuery;
     private List<Block> cachedVisible = List.of();
-    private DNAControlSlider secondarySlider, accentSlider;
+    private ParamSlider secondarySlider, accentSlider;
 
     private static final int TAB_SIZE = 22;
 
@@ -76,8 +76,8 @@ final class MaterialPanel {
         this.x = left;
         this.width = width;
         this.height = height;
-        this.contentHeight = Math.max(height, 220);
-        panelScroll = Math.clamp(panelScroll, 0, contentHeight - height);
+        this.contentHeight = contentHeightFor(height);
+        panelScroll = clampPanelScroll(panelScroll, height);
         this.gridTop = 22 + TAB_SIZE + 18 + 24 - panelScroll;
         this.gridBottom = contentHeight - 60 - panelScroll;
         this.rebuild = rebuild;
@@ -108,9 +108,9 @@ final class MaterialPanel {
         add.accept(more);
         var palette = state.config().blockPalette();
         int half = (width - 18) / 2;
-        secondarySlider = new DNAControlSlider(left + 8, contentHeight - 36 - panelScroll, half, "treefactory.secondary_weight", palette.secondaryWeight(),
+        secondarySlider = new ParamSlider(left + 8, contentHeight - 36 - panelScroll, half, "treefactory.secondary_weight", palette.secondaryWeight(),
                 v -> setWeights(v, state.config().blockPalette().accentWeight()));
-        accentSlider = new DNAControlSlider(left + 10 + half, contentHeight - 36 - panelScroll, half, "treefactory.accent_weight", palette.accentWeight(),
+        accentSlider = new ParamSlider(left + 10 + half, contentHeight - 36 - panelScroll, half, "treefactory.accent_weight", palette.accentWeight(),
                 v -> setWeights(state.config().blockPalette().secondaryWeight(), v));
         add.accept(secondarySlider);
         add.accept(accentSlider);
@@ -125,7 +125,12 @@ final class MaterialPanel {
     }
 
     private BlockPalette defaults() {
-        return BlockPalette.defaults(state.config().preset() == TreePreset.PINE ? "spruce" : "oak");
+        return BlockPalette.defaults(state.config().treeType() == TreeType.PINE ? "spruce" : "oak");
+    }
+
+    static int contentHeightFor(int height) { return Math.max(height, 220); }
+    static int clampPanelScroll(int scroll, int height) {
+        return Math.clamp(scroll, 0, contentHeightFor(height) - height);
     }
 
     private void setWeights(double secondary, double accent) {
@@ -247,9 +252,11 @@ final class MaterialPanel {
     boolean scrolled(double mx, double my, double vertical) {
         if (mx < x || mx >= x + width || my < 0 || my >= height) return false;
         if (my >= gridTop && my < gridBottom) {
-            scroll = Math.clamp(scroll - (int) (vertical * cellSize() * 2), 0, maxScroll(visible().size()));
-        } else if (contentHeight > height) {
-            int next=Math.clamp(panelScroll - (int)(vertical * 24), 0, contentHeight - height);
+            int next=Math.clamp(scroll - (int) (vertical * cellSize() * 2), 0, maxScroll(visible().size()));
+            if (next != scroll) { scroll=next; return true; }
+        }
+        if (contentHeight > height) {
+            int next=clampPanelScroll(panelScroll - (int)(vertical * 24), height);
             if (next != panelScroll) { panelScroll=next; rebuild.run(); }
         }
         return true;
