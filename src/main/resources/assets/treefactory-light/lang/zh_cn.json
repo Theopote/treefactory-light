@@ -85,6 +85,8 @@
   "treefactory.aim_first": "请在地面方块顶面点击右键放置树木",
   "treefactory.invalid_preview": "树木预览包含无效参数。",
   "treefactory.storage_unavailable": "无法读取树木存档，预览和撤销已禁用。请查看服务器日志。",
+  "treefactory.storage_write_failed": "无法保存预览恢复数据，已取消放置。请查看服务器日志。",
+  "treefactory.preview_placement_failed": "世界状态或权限发生变化，预览放置已中断。",
   "treefactory.wait_preview": "请等待当前预览生成完成",
   "treefactory.empty_library": "暂无预设。",
   "treefactory.saved": "预设已保存，正在生成缩略图",

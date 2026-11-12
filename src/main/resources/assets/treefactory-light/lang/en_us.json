@@ -85,6 +85,8 @@
   "treefactory.aim_first": "Right-click the top of a ground block to place the tree",
   "treefactory.invalid_preview": "The tree preview contains invalid parameters.",
   "treefactory.storage_unavailable": "Tree previews and undo are disabled: the saved tree state could not be loaded. Check the server log.",
+  "treefactory.storage_write_failed": "Could not save preview recovery data; placement was cancelled. Check the server log.",
+  "treefactory.preview_placement_failed": "Preview placement was interrupted because the world or permissions changed.",
   "treefactory.wait_preview": "Wait for the current preview to finish",
   "treefactory.empty_library": "No presets yet.",
   "treefactory.saved": "Preset saved; rendering thumbnail",

@@ -38,6 +38,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class WorldBatchPaster {
     private static final int FLAGS = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE; // 2 | 16
     private static final int MAX_BUILDS = 4;
+    private static final int PLACE_BUDGET = 512;
+    private static final int PLACE_SESSION_BUDGET = 128;
     private static final int RESTORE_BUDGET = 512;
     private static final int RESTORE_SESSION_BUDGET = 64;
     private static final int UNDO_LIMIT = 5;
@@ -56,8 +58,26 @@ public final class WorldBatchPaster {
     private record DeferredSession(UUID player, Session session) {}
     private record PendingChunk(ServerLevel level, ChunkPos pos) {}
     private record Request(BlockPos origin, TreeConfig config, long revision) {}
+    private static final class Placement {
+        final Session session;
+        final long revision;
+        final JournaledPlacement<BlockPos,BlockState> batch;
+        final Map<BlockPos,BlockState> blocks;
+        final Session previous;
+        final Iterator<BlockPos> restore;
+        boolean checkedDeferred;
+        Placement(Session session, Session previous, long revision, Map<BlockPos,BlockState> blocks) {
+            this.session=session;
+            this.previous=previous;
+            this.revision=revision;
+            this.blocks=blocks;
+            this.restore=previous==null ? Collections.emptyIterator() : new ArrayList<>(previous.placed.keySet()).iterator();
+            this.batch=new JournaledPlacement<>(session,blocks);
+        }
+    }
     private record DiskSnapshot(List<PersistedPreview> previews, Map<UUID,List<CommittedTree>> undo, Path target) {}
     private final Map<UUID,AtomicBoolean> pending = new HashMap<>();
+    private final Map<UUID,Placement> placements = new LinkedHashMap<>();
     private final Map<UUID,Session> sessions = new HashMap<>();
     private final List<DeferredSession> deferredSessions = new ArrayList<>();
     private final Set<PendingChunk> pendingChunks = new LinkedHashSet<>();
@@ -73,7 +93,7 @@ public final class WorldBatchPaster {
     private final CoalescedPersistQueue persistQueue = new CoalescedPersistQueue();
     private MinecraftServer server;
     private boolean storageUnavailable;
-    private boolean dirty;
+    private volatile boolean dirty;
     private long lastPersistNs;
     private int restoreCursor;
     private int restoreBudgetRemaining=RESTORE_BUDGET;
@@ -117,6 +137,7 @@ public final class WorldBatchPaster {
         if (!authorized(player)) return;
         UUID id = player.getUUID();
         cancelInFlight(id);
+        cancelPlacement(id);
         long revision = revisions.next(id);
         queued.put(id, new Request(origin, config, revision));
         startQueued();
@@ -131,6 +152,7 @@ public final class WorldBatchPaster {
         if (server==null) return;
         for (UUID id : new ArrayList<>(queued.keySet())) {
             if (pending.containsKey(id)) continue;
+            if (hasLoadedRestorations(id)) continue;
             if (pending.size()>=MAX_BUILDS) return;
             Long last=lastPreview.get(id);
             // A request pending commit must not be stuck behind the throttle: the player
@@ -192,12 +214,8 @@ public final class WorldBatchPaster {
                         Map<BlockPos,BlockState> blocks = new LinkedHashMap<>();
                         validation.placeable().forEach((cell, material) -> blocks.put(origin.offset(cell.x(),cell.y(),cell.z()),
                                 orient(materials.get(material), result.axes().get(cell))));
-                        if (apply(current, level, blocks)) {
-                            revisions.markApplied(id, revision);
-                            applied=true;
-                        } else {
-                            message(current,"treefactory.failed");
-                        }
+                        beginPlacement(current, level, blocks, revision);
+                        applied=true;
                     }
                 }
                 startQueued();
@@ -223,7 +241,7 @@ public final class WorldBatchPaster {
     private void tryFinishCommit(ServerPlayer player) { tryFinishCommit(player, true); }
     private void tryFinishCommit(ServerPlayer player, boolean latestApplied) {
         UUID id=player.getUUID();
-        if (pending.containsKey(id) || queued.containsKey(id)) return;
+        if (pending.containsKey(id) || queued.containsKey(id) || placements.containsKey(id)) return;
         if (!revisions.shouldCommit(id)) {
             if (revisions.commitTarget(id)!=null && !latestApplied) {
                 revisions.clearCommitTarget(id);
@@ -247,7 +265,7 @@ public final class WorldBatchPaster {
     }
     private void commit(ServerPlayer player) {
         UUID id=player.getUUID();
-        if (pending.containsKey(id) || queued.containsKey(id)) {
+        if (pending.containsKey(id) || queued.containsKey(id) || placements.containsKey(id)) {
             revisions.requestCommit(id, revisions.latest(id));
             startQueued();
             return;
@@ -313,15 +331,15 @@ public final class WorldBatchPaster {
     }
     /** Removes the preview tree and restores the world. */
     public void discard(UUID id) {
+        cancelPlacement(id);
         AtomicBoolean flag=pending.remove(id); if(flag!=null) flag.set(true);
         commitRequests.remove(id);
         revisions.clearCommitTarget(id);
         queued.remove(id);
-        Session session=sessions.get(id);
+        Session session=sessions.remove(id);
         if (session==null) return;
-        session.closing=true;
-        restoreAll(session);
-        if (session.placed.isEmpty()) sessions.remove(id);
+        scheduleRestoration(session);
+        defer(id,session);
         dirty=true;
     }
     public void disconnect(UUID id) { discard(id); persist(true); }
@@ -335,6 +353,7 @@ public final class WorldBatchPaster {
     }
     public void stop() {
         pending.values().forEach(f -> f.set(true)); pending.clear(); revisions.clearCommitTargets(); queued.clear();
+        for (UUID id : new ArrayList<>(placements.keySet())) cancelPlacement(id);
         for (UUID id : new ArrayList<>(sessions.keySet())) {
             Session session=sessions.get(id);
             if (session==null) continue;
@@ -356,6 +375,7 @@ public final class WorldBatchPaster {
         restoreBudgetRemaining=RESTORE_BUDGET;
         restoreLoadedChunks();
         startQueued();
+        tickPlacements();
         if (dirty) persist(false);
     }
     public void chunkLoaded(ServerLevel level, ChunkPos chunk) {
@@ -425,46 +445,105 @@ public final class WorldBatchPaster {
                     return replaceable(level.getBlockState(pos));
                 });
     }
-    private boolean apply(ServerPlayer player,ServerLevel level,Map<BlockPos,BlockState> blocks) {
+    private void beginPlacement(ServerPlayer player,ServerLevel level,Map<BlockPos,BlockState> blocks,long revision) {
         UUID id=player.getUUID();
-        Session session=sessions.get(id);
-        if (session!=null && session.level!=level) {
-            restoreAll(session);
-            defer(id, session);
-            session=null;
+        Session old=sessions.remove(id);
+        if (old!=null) {
+            defer(id,old);
+            dirty=true;
         }
-        if (session==null) { session=new Session(level); sessions.put(id,session); }
-        session.closing=false;
-        Iterator<Map.Entry<BlockPos,BlockState>> tracked=session.placed.entrySet().iterator();
-        while (tracked.hasNext()) {
-            var entry=tracked.next();
-            if (chunkReady(level, entry.getKey()) && !level.getBlockState(entry.getKey()).equals(entry.getValue())) {
-                session.original.remove(entry.getKey()); session.pendingRestore.remove(entry.getKey()); tracked.remove();
-            }
-        }
-        Map<BlockPos,BlockState> next=new HashMap<>(blocks);
-        for (BlockPos pos:new ArrayList<>(session.placed.keySet())) if (!next.containsKey(pos)) restore(session,pos);
-        for (var entry:next.entrySet()) {
-            BlockPos pos=entry.getKey();
-            if (inaccessibleReason(level, pos)!=null || !level.mayInteract(player, pos))
-                return abortApply(id, session);
-            if (!session.place(pos,entry.getValue(),WorldBatchPaster::replaceable,level::getBlockState,
-                    (p,state) -> level.setBlock(p,state,FLAGS))) {
-                TreefactoryLight.LOGGER.warn("Could not place preview block at {} in {}",
-                        pos, level.dimension().identifier());
-                return abortApply(id, session);
-            }
-        }
-        session.replacePlaced(next);
-        dirty=true;
-        return true;
+        Session session=new Session(level);
+        sessions.put(id,session);
+        placements.put(id,new Placement(session,old,revision,blocks));
     }
-    private boolean abortApply(UUID id, Session session) {
-        session.closing=true;
-        restoreAll(session);
-        if (session.placed.isEmpty()) sessions.remove(id,session);
+
+    private void cancelPlacement(UUID id) {
+        Placement placement=placements.remove(id);
+        if (placement!=null) abortPlacement(id,placement);
+    }
+
+    private void abortPlacement(UUID id, Placement placement) {
+        Session session=placement.session;
+        placement.batch.forgetUnwritten();
+        if (placement.previous!=null) scheduleRestoration(placement.previous);
+        sessions.remove(id,session);
+        scheduleRestoration(session);
+        defer(id,session);
         dirty=true;
-        return false;
+    }
+
+    private void failPlacement(UUID id, Placement placement, ServerPlayer player, String reason) {
+        placements.remove(id);
+        abortPlacement(id,placement);
+        if (player!=null) {
+            message(player,reason);
+            tryFinishCommit(player,false);
+        } else {
+            commitRequests.remove(id);
+            revisions.clearCommitTarget(id);
+        }
+    }
+
+    private void tickPlacements() {
+        int budget=PLACE_BUDGET;
+        for (UUID id : new ArrayList<>(placements.keySet())) {
+            if (budget<=0) break;
+            Placement placement=placements.get(id);
+            if (placement==null) continue;
+            placements.remove(id);
+            placements.put(id,placement);
+            ServerPlayer player=server.getPlayerList().getPlayer(id);
+            if (player==null || player.level()!=placement.session.level || !authorized(player)) {
+                failPlacement(id,placement,player,"treefactory.preview_placement_failed");
+                continue;
+            }
+            if (placement.restore.hasNext()) {
+                int count=Math.min(budget,PLACE_SESSION_BUDGET);
+                while (count-- > 0 && placement.restore.hasNext()) {
+                    restore(placement.previous,placement.restore.next());
+                    budget--;
+                }
+                dirty=true;
+                continue;
+            }
+            if (!placement.checkedDeferred) {
+                boolean overlap=false;
+                for (DeferredSession deferred : deferredSessions) {
+                    if (deferred.session().level==placement.session.level
+                            && !Collections.disjoint(deferred.session().placed.keySet(),placement.blocks.keySet())) {
+                        overlap=true;
+                        break;
+                    }
+                }
+                if (overlap) {
+                    failPlacement(id,placement,player,"treefactory.preview_placement_failed");
+                    continue;
+                }
+                placement.checkedDeferred=true;
+                deferredSessions.removeIf(deferred -> deferred.session().placed.isEmpty());
+            }
+            ServerLevel level=placement.session.level;
+            var result=placement.batch.tick(budget,PLACE_SESSION_BUDGET,
+                    pos -> inaccessibleReason(level,pos)==null && level.mayInteract(player,pos)
+                            && !hasDeferredFootprint(level,pos),
+                    level::getBlockState,WorldBatchPaster::replaceable,
+                    (pos,state) -> level.setBlock(pos,state,FLAGS),() -> persist(true));
+            budget-=result.consumed();
+            switch (result.status()) {
+                case FAILED -> failPlacement(id,placement,player,"treefactory.preview_placement_failed");
+                case STORAGE_FAILED -> {
+                    if (result.error()!=null)
+                        TreefactoryLight.LOGGER.error("Could not journal tree preview placement for {}",id,result.error());
+                    failPlacement(id,placement,player,"treefactory.storage_write_failed");
+                }
+                case COMPLETE -> {
+                    placements.remove(id);
+                    revisions.markApplied(id,placement.revision);
+                    tryFinishCommit(player);
+                }
+                case WAITING, PROGRESS -> { }
+            }
+        }
     }
     private boolean restore(Session session,BlockPos pos) {
         boolean restored=session.restore(pos, p -> chunkReady(session.level, p), session.level::getBlockState,
@@ -480,6 +559,27 @@ public final class WorldBatchPaster {
     }
     private void restoreAll(Session session) {
         for (BlockPos pos:new ArrayList<>(session.placed.keySet())) restore(session,pos);
+    }
+    private void scheduleRestoration(Session session) {
+        for (BlockPos pos : session.placed.keySet()) {
+            session.pendingRestore.add(pos);
+            pendingChunks.add(new PendingChunk(session.level, new ChunkPos(
+                    SectionPos.blockToSectionCoord(pos.getX()), SectionPos.blockToSectionCoord(pos.getZ()))));
+        }
+    }
+    private boolean hasLoadedRestorations(UUID id) {
+        for (DeferredSession deferred : deferredSessions) {
+            if (!deferred.player().equals(id)) continue;
+            Session session=deferred.session();
+            for (BlockPos pos : session.pendingRestore)
+                if (chunkReady(session.level,pos)) return true;
+        }
+        return false;
+    }
+    private boolean hasDeferredFootprint(ServerLevel level, BlockPos pos) {
+        for (DeferredSession deferred : deferredSessions)
+            if (deferred.session().level==level && deferred.session().placed.containsKey(pos)) return true;
+        return false;
     }
     private static String inaccessibleReason(ServerLevel level,BlockPos pos) {
         if(level.isOutsideBuildHeight(pos)) return "treefactory.target_height";
@@ -513,7 +613,7 @@ public final class WorldBatchPaster {
      * so dragging a preview around does not serialize/gzip the whole file on every changed tick.
      * Returns the scheduled write, or {@code null} if nothing was scheduled.
      */
-    private Future<?> persist(boolean immediate) {
+    private CompletableFuture<Void> persist(boolean immediate) {
         if (server==null || storageUnavailable) return null;
         if (!immediate) {
             long now=System.nanoTime();
