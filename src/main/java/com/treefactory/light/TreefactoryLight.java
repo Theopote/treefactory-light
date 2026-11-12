@@ -11,6 +11,7 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.*;
 import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.FullChunkStatus;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.fabricmc.fabric.api.creativetab.v1.CreativeModeTabEvents;
@@ -39,13 +40,13 @@ public class TreefactoryLight implements ModInitializer {
 		PayloadTypeRegistry.serverboundPlay().register(C2SFinishTreePacket.TYPE,C2SFinishTreePacket.CODEC);
 		PayloadTypeRegistry.serverboundPlay().register(C2SUndoTreePacket.TYPE,C2SUndoTreePacket.CODEC);
 		PayloadTypeRegistry.clientboundPlay().register(S2CTreeCommitResultPacket.TYPE,S2CTreeCommitResultPacket.CODEC);
-		PASTER.setCommitNotifier((player, success) ->
-				ServerPlayNetworking.send(player, new S2CTreeCommitResultPacket(success)));
+		PASTER.setCommitNotifier((player, requestId, success) ->
+				ServerPlayNetworking.send(player, new S2CTreeCommitResultPacket(requestId, success)));
 		ServerPlayNetworking.registerGlobalReceiver(C2SPreviewTreePacket.TYPE,(packet,context) ->
 				context.server().execute(() -> PASTER.preview(context.player(),packet.origin(),packet.config())));
 		ServerPlayNetworking.registerGlobalReceiver(C2SFinishTreePacket.TYPE,(packet,context) ->
 				context.server().execute(() -> {
-					if (packet.commit()) PASTER.commit(context.player()); else PASTER.discard(context.player().getUUID());
+					if (packet.commit()) PASTER.requestCommit(context.player(), packet.requestId()); else PASTER.discard(context.player().getUUID());
 				}));
 		ServerPlayNetworking.registerGlobalReceiver(C2SUndoTreePacket.TYPE,(packet,context) ->
 				context.server().execute(() -> PASTER.undo(context.player())));
@@ -54,6 +55,10 @@ public class TreefactoryLight implements ModInitializer {
 		ServerLifecycleEvents.SERVER_STOPPING.register(server -> PASTER.stop());
 		ServerTickEvents.END_SERVER_TICK.register(server -> PASTER.tick());
 		ServerChunkEvents.CHUNK_LOAD.register((level,chunk,generated) -> PASTER.chunkLoaded(level, chunk.getPos()));
+		ServerChunkEvents.FULL_CHUNK_STATUS_CHANGE.register((level,chunk,oldStatus,newStatus) -> {
+			if (oldStatus == FullChunkStatus.INACCESSIBLE && newStatus.isOrAfter(FullChunkStatus.FULL))
+				PASTER.chunkLoaded(level, chunk.getPos());
+		});
 		LOGGER.info("Treefactory Light beta initialized");
 	}
 

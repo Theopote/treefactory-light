@@ -203,7 +203,9 @@ public final class DrawerScreen extends Screen {
 
     private void onFinishClicked() {
         if (state.finishPhase() != ClientTreeState.FinishPhase.NONE) return;
-        state.requestFinish(this::onClose);
+        state.requestFinish(() -> {
+            if (minecraft.gui.screen() == this) onClose();
+        });
         updateFinishButton();
     }
 
@@ -332,6 +334,7 @@ public final class DrawerScreen extends Screen {
 
     @Override
     public void removed() {
+        state.cancel();
         if (previousHideGui != null) {
             if (!previousHideGui && minecraft.gui.hud.isHidden()) minecraft.gui.hud.toggle();
             previousHideGui = null;

@@ -24,7 +24,7 @@ public class TreefactoryLightClient implements ClientModInitializer {
 		});
 		ClientPlayConnectionEvents.DISCONNECT.register((handler,client) -> client.execute(ClientTreeState.INSTANCE::disconnect));
 		ClientPlayNetworking.registerGlobalReceiver(S2CTreeCommitResultPacket.TYPE,(packet, context) ->
-				context.client().execute(() -> ClientTreeState.INSTANCE.onCommitResult(packet.success())));
+				context.client().execute(() -> ClientTreeState.INSTANCE.onCommitResult(packet.requestId(), packet.success())));
 		PictureInPictureRendererRegistry.register(context -> new TreePictureRenderer());
 	}
 }

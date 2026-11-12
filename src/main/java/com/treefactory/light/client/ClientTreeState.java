@@ -34,13 +34,12 @@ public final class ClientTreeState {
     private List<PresetStore.Preset> presets=BUILT_IN_PRESETS;
     private String status="";
     public enum FinishPhase { NONE, PREPARING, FINISHING }
-    private FinishPhase finishPhase=FinishPhase.NONE;
-    private Runnable finishCallback;
+    private final FinishRequest finish=new FinishRequest();
     public TreeConfig config() { return config; }
     public PreviewSnapshot preview() { return preview!=null && preview.config().equals(config)?preview:null; }
     public List<PresetStore.Preset> presets() { return presets; }
     public String status() { return status; }
-    public FinishPhase finishPhase() { return finishPhase; }
+    public FinishPhase finishPhase() { return finish.phase(); }
     public boolean isGenerating() { return generating; }
     public boolean update(TreeConfig next) {
         if(config.equals(next)) return true;
@@ -131,7 +130,7 @@ public final class ClientTreeState {
         if(active && mc.level!=null && !(mc.gui.screen() instanceof DrawerScreen)) cancel();
         if(mc.level==null || (!holdingWand() && !(mc.gui.screen() instanceof DrawerScreen))) return;
         if(placeDirty && target!=null && System.nanoTime()-placeChangedAt>=80_000_000L) sendPreview();
-        if(finishPhase==FinishPhase.PREPARING && !generating && !dirty && !placeDirty) sendFinishRequest();
+        if(finish.phase()==FinishPhase.PREPARING && !generating && !dirty && !placeDirty) sendFinishRequest();
         if(!dirty || generating || System.nanoTime()-changedAt<50_000_000L) return;
         generating=true; dirty=false;
         long token=revision.get(); TreeConfig snapshot=config; status=Component.translatable("treefactory.generating").getString();
@@ -152,12 +151,12 @@ public final class ClientTreeState {
     }
     /** Requests permanent placement; {@code onSuccess} runs only after the server confirms. */
     public void requestFinish(Runnable onSuccess) {
-        if(finishPhase!=FinishPhase.NONE) return;
+        if(finish.phase()!=FinishPhase.NONE) return;
         if(!active || target==null) { toast("treefactory.aim_first"); return; }
         if(!ClientPlayNetworking.canSend(C2SFinishTreePacket.TYPE)) { toast("treefactory.no_server"); return; }
-        finishCallback=onSuccess;
-        if(generating || dirty || placeDirty) {
-            finishPhase=FinishPhase.PREPARING;
+        boolean preparing=generating || dirty || placeDirty;
+        finish.begin(onSuccess, preparing);
+        if(preparing) {
             if(placeDirty) sendPreview();
             return;
         }
@@ -165,15 +164,12 @@ public final class ClientTreeState {
     }
 
     private void sendFinishRequest() {
-        finishPhase=FinishPhase.FINISHING;
-        ClientPlayNetworking.send(new C2SFinishTreePacket(true));
+        ClientPlayNetworking.send(new C2SFinishTreePacket(true, finish.send()));
     }
 
-    public void onCommitResult(boolean success) {
-        if(finishPhase==FinishPhase.NONE) return;
-        finishPhase=FinishPhase.NONE;
-        Runnable callback=finishCallback;
-        finishCallback=null;
+    public void onCommitResult(long requestId, boolean success) {
+        if(!finish.matches(requestId)) return;
+        Runnable callback=finish.clear();
         if(success) {
             active=false; target=null; placeDirty=false; previewOrigin=null;
             if(callback!=null) callback.run();
@@ -181,7 +177,8 @@ public final class ClientTreeState {
     }
     /** Removes the unfinished preview tree from the world. */
     public void cancel() {
-        if(active && ClientPlayNetworking.canSend(C2SFinishTreePacket.TYPE)) ClientPlayNetworking.send(new C2SFinishTreePacket(false));
+        finish.clear();
+        if(active && ClientPlayNetworking.canSend(C2SFinishTreePacket.TYPE)) ClientPlayNetworking.send(new C2SFinishTreePacket(false, 0));
         active=false; target=null; placeDirty=false; previewOrigin=null;
     }
     public void undo() {
@@ -232,7 +229,7 @@ public final class ClientTreeState {
     }
     public void disconnect() {
         revision.incrementAndGet(); preview=null; dirty=true; target=null; previewOrigin=null; active=false; placeDirty=false;
-        finishPhase=FinishPhase.NONE; finishCallback=null; presets=BUILT_IN_PRESETS;
+        finish.clear(); presets=BUILT_IN_PRESETS;
         ThumbnailFBOMaker.clear();
         sessionEpoch++;
     }
