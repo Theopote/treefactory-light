@@ -11,7 +11,7 @@ public final class PreviewRevision {
     private final Map<UUID, Long> commitTarget = new HashMap<>();
 
     public long next(UUID player) {
-        return latest.merge(player, 0L, (a, b) -> a + 1);
+        return latest.merge(player, 1L, (a, b) -> a + 1);
     }
 
     public long latest(UUID player) { return latest.getOrDefault(player, 0L); }
@@ -33,7 +33,8 @@ public final class PreviewRevision {
 
     /** Latest preview request was successfully applied to the world. */
     public boolean isAppliedCurrent(UUID player) {
-        return applied.getOrDefault(player, 0L) == latest.getOrDefault(player, 0L);
+        Long current=latest.get(player);
+        return current != null && current.equals(applied.get(player));
     }
 
     /** Commit is allowed only when the live preview matches the latest request revision. */

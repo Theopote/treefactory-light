@@ -138,7 +138,7 @@ public final class Voxelizer {
                     Cell cell = new Cell(x,y,z);
                     if (!material.woody()) {
                         double dx=x+.5-a.x(),dy=y+.5-a.y(),dz=z+.5-a.z();
-                        if (Math.sqrt(dx*dx+dy*dy+dz*dz) > r*(.78+.3*cellHash(x,y,z,seed^0x5bd1e995L))) continue;
+                        if (StrictMath.sqrt(dx*dx+dy*dy+dz*dz) > r*(.78+.3*cellHash(x,y,z,seed^0x5bd1e995L))) continue;
                         acc.putLeaf(cell, leafMaterial(cell,seed,palette));
                     } else acc.putWood(cell, material, axis);
                 }
@@ -163,7 +163,7 @@ public final class Voxelizer {
         int x=(int)Math.floor(a.x()),y=(int)Math.floor(a.y()),z=(int)Math.floor(a.z());
         acc.putWood(new Cell(x,y,z),wood,axis);
         Vector3 delta=b.subtract(a);
-        int steps=Math.max(1,(int)Math.ceil(Math.sqrt(delta.lengthSquared())*4));
+        int steps=Math.max(1,(int)Math.ceil(StrictMath.sqrt(delta.lengthSquared())*4));
         for(int i=1;i<=steps;i++) {
             Vector3 p=a.add(delta.multiply(i/(double)steps));
             int tx=(int)Math.floor(p.x()),ty=(int)Math.floor(p.y()),tz=(int)Math.floor(p.z());

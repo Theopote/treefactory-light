@@ -73,7 +73,7 @@ public final class DrawerScreen extends Screen {
             previousHideGui = minecraft.gui.hud.isHidden();
             if (!previousHideGui) minecraft.gui.hud.toggle();
         }
-        materialWidth = MaterialPanel.widthFor(width);
+        materialWidth = MaterialPanel.panelWidth();
         materialLeft = panel;
         int w = panel - 2 * M - SCROLLBAR_W;
         int half = (w - 2) / 2;

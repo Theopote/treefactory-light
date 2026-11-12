@@ -10,19 +10,19 @@ public enum CanopyShape implements ICanopyShape {
     UMBRELLA {
         public double field(double x,double y,double z) {
             double r2=x*x+z*z;
-            return Math.max(r2-1,Math.max(y-(.22+.28*Math.sqrt(Math.max(0,1-r2))),-.23-.32*r2-y));
+            return Math.max(r2-1,Math.max(y-(.22+.28*StrictMath.sqrt(Math.max(0,1-r2))),-.23-.32*r2-y));
         }
     },
     CONE {
         public double field(double x,double y,double z) {
             double t=(y+1)*.5;
-            return Math.max(Math.abs(y)-1,Math.hypot(x,z)-(1-t));
+            return Math.max(Math.abs(y)-1,StrictMath.hypot(x,z)-(1-t));
         }
     },
     TRUNCATED_CONE {
         public double field(double x,double y,double z) {
             double t=(y+1)*.5;
-            return Math.max(Math.abs(y)-.78,Math.hypot(x,z)-(.95-.7*t));
+            return Math.max(Math.abs(y)-.78,StrictMath.hypot(x,z)-(.95-.7*t));
         }
     },
     CYLINDER {
@@ -74,7 +74,7 @@ public enum CanopyShape implements ICanopyShape {
         public double field(double x,double y,double z) {
             double t=(y+1)*.5;
             double radius=(1-t)*(1-t);
-            return Math.max(Math.abs(y)-1,Math.hypot(x,z)-radius);
+            return Math.max(Math.abs(y)-1,StrictMath.hypot(x,z)-radius);
         }
     };
     /** Shapes other than the layered spindle ignore the layer count. */
@@ -124,7 +124,7 @@ public enum CanopyShape implements ICanopyShape {
         int n=Math.max(2,layers);
         double spacing=1.16/(n-1), thickness=.4*spacing, best=Double.POSITIVE_INFINITY;
         for(int i=0;i<n;i++) {
-            double t=i/(double)(n-1), radius=.72+.28*Math.sin(Math.PI*t);
+            double t=i/(double)(n-1), radius=.72+.28*StrictMath.sin(Math.PI*t);
             double radial=(x*x+z*z)/(radius*radius);
             double vertical=(y-(-.58+i*spacing))/thickness;
             best=Math.min(best,radial+vertical*vertical-1);
@@ -135,8 +135,8 @@ public enum CanopyShape implements ICanopyShape {
         double t=(y+1)*.5;
         if(t<0 || t>1) return Math.abs(y)-1;
         double alpha=peak*2,beta=(1-peak)*2;
-        double maximum=Math.pow(peak,alpha)*Math.pow(1-peak,beta);
-        double radius2=Math.pow(t,alpha)*Math.pow(1-t,beta)/maximum;
+        double maximum=StrictMath.pow(peak,alpha)*StrictMath.pow(1-peak,beta);
+        double radius2=StrictMath.pow(t,alpha)*StrictMath.pow(1-t,beta)/maximum;
         return Math.max(Math.abs(y)-1,x*x+z*z-radius2);
     }
     public static CanopyShape forPreset(TreeType preset) {

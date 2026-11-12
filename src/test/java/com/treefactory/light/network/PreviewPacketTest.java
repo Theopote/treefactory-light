@@ -10,6 +10,19 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class PreviewPacketTest {
+    @Test void rejectsInvalidNumericValueWithoutDisconnecting() {
+        var buffer=new RegistryFriendlyByteBuf(Unpooled.buffer(),RegistryAccess.EMPTY);
+        try {
+            C2SPreviewTreePacket.CODEC.encode(buffer,new C2SPreviewTreePacket(BlockPos.ZERO,TreeConfig.defaults()));
+            buffer.setDouble(9,Double.NaN);
+            var decoded=C2SPreviewTreePacket.CODEC.decode(buffer);
+            assertNull(decoded.config());
+            assertNotNull(decoded.validationError());
+            assertFalse(buffer.isReadable());
+        } finally {
+            buffer.release();
+        }
+    }
     @Test void roundTripsTreeTypeAndContinuousHeight() {
         var buffer=new RegistryFriendlyByteBuf(Unpooled.buffer(),RegistryAccess.EMPTY);
         try {

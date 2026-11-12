@@ -21,7 +21,7 @@ public final class SpaceColonizer {
         double vertical = config.crownVerticalScale(), crownCenter = config.crownCenterHeight();
         double leanAngle = random.nextDouble()*Math.PI*2;
         double leanMag = height*.05*(.3+config.crookedness()*1.4);
-        double crownDX = Math.cos(leanAngle)*leanMag*1.5, crownDZ = Math.sin(leanAngle)*leanMag*1.5;
+        double crownDX = StrictMath.cos(leanAngle)*leanMag*1.5, crownDZ = StrictMath.sin(leanAngle)*leanMag*1.5;
         List<Vector3> attractors = new ArrayList<>();
         int count = Math.min(1500,(int)(500 * config.attractionDensity()));
         for (int i = 0; i < count; i++) {
@@ -46,8 +46,8 @@ public final class SpaceColonizer {
             double y = Math.min(i,height);
             double t = y/height, ease = t*t;
             double wob = (.25+config.crookedness()*.9);
-            double bx = Math.cos(leanAngle)*leanMag*ease + wob*noise.sample(y*.19+11.3,5.1,2.2);
-            double bz = Math.sin(leanAngle)*leanMag*ease + wob*noise.sample(y*.19+3.7,9.4,6.6);
+            double bx = StrictMath.cos(leanAngle)*leanMag*ease + wob*noise.sample(y*.19+11.3,5.1,2.2);
+            double bz = StrictMath.sin(leanAngle)*leanMag*ease + wob*noise.sample(y*.19+3.7,9.4,6.6);
             nodes.add(new TreeNode(new Vector3(.5+bx,y+.5,.5+bz), nodes.size()-1,.5));
         }
         double influence = Math.max(5, height*.4*config.canopyScale()), kill2 = 1.2*1.2;
@@ -94,7 +94,7 @@ public final class SpaceColonizer {
                         .add(perturb.multiply(config.crookedness()*.3)).normalize();
                 if(!bias.allowDownward() && dir.y()<0) {
                     // Never descend, but do not flatten to an exact plane either: a small noise-driven rise.
-                    double h=Math.hypot(dir.x(),dir.z());
+                    double h=StrictMath.hypot(dir.x(),dir.z());
                     double rise=.04+.14*Math.abs(perturb.y());
                     dir = h<1e-6 ? new Vector3(0,1,0) : new Vector3(dir.x()/h,rise,dir.z()/h).normalize();
                 }
@@ -143,7 +143,7 @@ public final class SpaceColonizer {
             for (int step = 0; step < steps && nodes.size() < MAX_NODES; step++) {
                 check(cancelled);
                 Vector3 base = nodes.get(parent).position();
-                Vector3 next = base.add(new Vector3(Math.cos(angle) * out, -down, Math.sin(angle) * out));
+                Vector3 next = base.add(new Vector3(StrictMath.cos(angle) * out, -down, StrictMath.sin(angle) * out));
                 if (next.y() < 0.5 || !occupied.add(quantize(next))) break;
                 nodes.add(new TreeNode(next, parent, 0.45));
                 parent = nodes.size() - 1;

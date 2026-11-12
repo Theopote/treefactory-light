@@ -1,17 +1,15 @@
 package com.treefactory.light.client;
 
-import com.treefactory.light.core.algorithm.Voxelizer;
 import com.treefactory.light.core.config.TreeConfig;
 import com.treefactory.light.core.tree.*;
 import java.util.*;
 
-public record PreviewSnapshot(TreeConfig config, TreeBuildTask.Result tree, List<Face> faces,
+public record PreviewSnapshot(TreeConfig config, TreeBuildTask.Result tree,
                               List<Cell> surface, double centerY, double extent,
                               int blockWidth,int blockHeight,int blockDepth) {
-    public record Face(Cell cell, int side, Voxelizer.Material material) {}
     public static final int[][] OFFSETS={{-1,0,0},{1,0,0},{0,-1,0},{0,1,0},{0,0,-1},{0,0,1}};
     public static PreviewSnapshot create(TreeConfig config,TreeBuildTask.Result tree) {
-        List<Face> faces=new ArrayList<>(); List<Cell> surface=new ArrayList<>();
+        List<Cell> surface=new ArrayList<>();
         int minX=Integer.MAX_VALUE,maxX=Integer.MIN_VALUE,minY=Integer.MAX_VALUE,maxY=Integer.MIN_VALUE;
         int minZ=Integer.MAX_VALUE,maxZ=Integer.MIN_VALUE;
         for(var entry:tree.blocks().entrySet()) {
@@ -20,7 +18,7 @@ public record PreviewSnapshot(TreeConfig config, TreeBuildTask.Result tree, List
                 int[] d=OFFSETS[side];
                 var neighbor=tree.blocks().get(new Cell(c.x()+d[0],c.y()+d[1],c.z()+d[2]));
                 if(neighbor==null || entry.getValue().woody() && !neighbor.woody()) {
-                    faces.add(new Face(c,side,entry.getValue())); visible=true;
+                    visible=true; break;
                 }
             }
             if(visible) surface.add(c);
@@ -31,7 +29,7 @@ public record PreviewSnapshot(TreeConfig config, TreeBuildTask.Result tree, List
         // Conservative rotating bounding sphere fit, including the crown width and branch thickness.
         double horizontal=Math.max(Math.max(Math.abs(minX),maxX+1),Math.max(Math.abs(minZ),maxZ+1));
         double radius=Math.sqrt(horizontal*horizontal*2+maxY*maxY*.25);
-        return new PreviewSnapshot(config,tree,List.copyOf(faces),List.copyOf(surface),maxY*.5,Math.max(1,radius*2),
+        return new PreviewSnapshot(config,tree,List.copyOf(surface),maxY*.5,Math.max(1,radius*2),
                 maxX-minX+1,maxY-minY,maxZ-minZ+1);
     }
 }

@@ -9,6 +9,30 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class TreePlacementValidatorTest {
+    @Test void rejectsBlockedRootEvenWhenOtherWoodIsPlaceable() {
+        Map<Cell,Voxelizer.Material> blocks=Map.of(
+                new Cell(0,0,0),Voxelizer.Material.MAIN_TRUNK,
+                new Cell(0,1,0),Voxelizer.Material.MAIN_TRUNK);
+        var result=TreePlacementValidator.validate(blocks, cell -> null, cell -> true,
+                cell -> !cell.equals(new Cell(0,0,0)));
+        assertFalse(result.ok());
+        assertEquals("treefactory.target_protected",result.messageKey());
+    }
+
+    @Test void removesDisconnectedWoodAndItsIsolatedLeaves() {
+        Cell root=new Cell(0,0,0), blocked=new Cell(0,1,0), branch=new Cell(0,2,0);
+        Cell leaf=new Cell(0,3,0), attached=new Cell(1,0,0);
+        Map<Cell,Voxelizer.Material> blocks=Map.of(
+                root,Voxelizer.Material.MAIN_TRUNK, blocked,Voxelizer.Material.MAIN_TRUNK,
+                branch,Voxelizer.Material.THIN_BRANCH, leaf,Voxelizer.Material.PRIMARY_LEAF,
+                attached,Voxelizer.Material.PRIMARY_LEAF);
+        var result=TreePlacementValidator.validate(blocks, cell -> null, cell -> true,
+                cell -> !cell.equals(blocked));
+        assertTrue(result.ok());
+        assertEquals(Map.of(root,Voxelizer.Material.MAIN_TRUNK,attached,Voxelizer.Material.PRIMARY_LEAF),
+                result.placeable());
+    }
+
     @Test void rejectsWhenNoWoodyBlockCanBePlaced() {
         Map<Cell, Voxelizer.Material> blocks = Map.of(
                 new Cell(0, 0, 0), Voxelizer.Material.MAIN_TRUNK,

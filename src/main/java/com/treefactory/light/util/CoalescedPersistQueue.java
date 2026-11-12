@@ -2,63 +2,61 @@ package com.treefactory.light.util;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.RejectedExecutionException;
 
-/**
- * Merges rapid persist requests. Each enqueue supplies an already-captured snapshot;
- * the worker always writes the latest snapshot and only marks the generation it actually persisted.
- */
+/** Serializes snapshots and completes each drain only after every snapshot enqueued in that drain is written. */
 final class CoalescedPersistQueue {
     private record Entry(long generation, Object snapshot) {}
 
-    private final AtomicLong generation = new AtomicLong();
-    private final AtomicLong writtenGeneration = new AtomicLong();
-    private final AtomicBoolean draining = new AtomicBoolean();
-    private volatile Entry latestEntry;
-    private volatile CompletableFuture<Void> active = CompletableFuture.completedFuture(null);
+    private long generation, writtenGeneration;
+    private Entry latestEntry;
+    private CompletableFuture<Void> active;
 
     interface PersistWriter {
         void write(Object snapshot) throws Exception;
     }
 
-    /** @param snapshot immutable payload captured on the caller thread */
-    CompletableFuture<Void> enqueue(Object snapshot, PersistWriter writer, Executor executor) {
-        long gen = generation.incrementAndGet();
-        latestEntry = new Entry(gen, snapshot);
-        if (draining.compareAndSet(false, true)) {
-            CompletableFuture<Void> drainFuture = new CompletableFuture<>();
-            active = drainFuture;
-            executor.execute(() -> runDrain(drainFuture, writer, executor));
-            return drainFuture;
+    synchronized CompletableFuture<Void> enqueue(Object snapshot, PersistWriter writer, Executor executor) {
+        latestEntry = new Entry(++generation, snapshot);
+        if (active == null) {
+            active = new CompletableFuture<>();
+            CompletableFuture<Void> future = active;
+            try {
+                executor.execute(() -> runDrain(future, writer));
+            } catch (RejectedExecutionException error) {
+                active = null;
+                future.completeExceptionally(error);
+            }
+            return future;
         }
         return active;
     }
 
-    long pendingGenerations() { return generation.get() - writtenGeneration.get(); }
+    synchronized long pendingGenerations() { return generation - writtenGeneration; }
+    synchronized long writtenGeneration() { return writtenGeneration; }
 
-    long writtenGeneration() { return writtenGeneration.get(); }
-
-    private void runDrain(CompletableFuture<Void> future, PersistWriter writer, Executor executor) {
+    private void runDrain(CompletableFuture<Void> future, PersistWriter writer) {
         try {
-            while (writtenGeneration.get() < generation.get()) {
-                Entry entry = latestEntry;
-                if (entry == null) throw new IllegalStateException("Missing persist snapshot");
-                long targetGen = entry.generation();
+            while (true) {
+                Entry entry;
+                synchronized (this) {
+                    if (writtenGeneration == generation) {
+                        active = null;
+                        future.complete(null);
+                        return;
+                    }
+                    entry = latestEntry;
+                }
                 writer.write(entry.snapshot());
-                writtenGeneration.set(targetGen);
+                synchronized (this) {
+                    writtenGeneration = entry.generation();
+                }
             }
-            future.complete(null);
         } catch (Exception error) {
-            future.completeExceptionally(error);
-            return;
-        } finally {
-            draining.set(false);
-        }
-        if (writtenGeneration.get() < generation.get() && draining.compareAndSet(false, true)) {
-            CompletableFuture<Void> next = new CompletableFuture<>();
-            active = next;
-            executor.execute(() -> runDrain(next, writer, executor));
+            synchronized (this) {
+                active = null;
+                future.completeExceptionally(error);
+            }
         }
     }
 }

@@ -22,14 +22,14 @@ public final class PipeModelEngine {
         for (int i=n-1;i>=0;i--) {
             TreeNode node=skeleton.get(i);
             if (node.parent() >= i || node.parent() < -1) throw new IllegalArgumentException("Invalid tree topology");
-            raw[i]= sums[i]==0 ? .5 : Math.pow(sums[i],1/e);
-            if (node.parent()>=0) { sums[node.parent()]+=Math.pow(raw[i],e); h[node.parent()]=Math.max(h[node.parent()],h[i]+1); }
+            raw[i]= sums[i]==0 ? .5 : StrictMath.pow(sums[i],1/e);
+            if (node.parent()>=0) { sums[node.parent()]+=StrictMath.pow(raw[i],e); h[node.parent()]=Math.max(h[node.parent()],h[i]+1); }
         }
         double span=cap-.5, hRoot=Math.max(1,h[0]);
         double[] fin=new double[n]; List<TreeNode> out=new ArrayList<>(skeleton);
         for (int i=0;i<n;i++) {
-            double pipe = .5+span*(1-Math.exp(-.5*(raw[i]-.5)/span));
-            double len  = .5+(cap-.5)*Math.pow(h[i]/hRoot,GAMMA);
+            double pipe = .5+span*(1-StrictMath.exp(-.5*(raw[i]-.5)/span));
+            double len  = .5+(cap-.5)*StrictMath.pow(h[i]/hRoot,GAMMA);
             double r = (1-LENGTH_WEIGHT)*pipe + LENGTH_WEIGHT*len;
             TreeNode node=skeleton.get(i);
             if (node.parent()>=0) r=Math.min(r,fin[node.parent()]/t);
@@ -48,9 +48,9 @@ public final class PipeModelEngine {
             TreeNode node = skeleton.get(i);
             if (node.parent() >= i || node.parent() < -1) throw new IllegalArgumentException("Invalid tree topology");
             // No additive radius per generation: that compounded through deep branching.
-            double radius = Math.min(maxRadius,sums[i] == 0 ? .5 : Math.pow(sums[i],1/exponent));
+            double radius = Math.min(maxRadius,sums[i] == 0 ? .5 : StrictMath.pow(sums[i],1/exponent));
             result.set(i,node.withRadius(radius));
-            if (node.parent() >= 0) sums[node.parent()] += Math.pow(radius,exponent);
+            if (node.parent() >= 0) sums[node.parent()] += StrictMath.pow(radius,exponent);
         }
         return List.copyOf(result);
     }

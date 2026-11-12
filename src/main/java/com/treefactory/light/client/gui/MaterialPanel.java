@@ -68,7 +68,7 @@ final class MaterialPanel {
         }
     }
 
-    static int widthFor(int screenWidth) { return GRID_COLS * GRID_CELL + 16; }
+    static int panelWidth() { return GRID_COLS * GRID_CELL + 16; }
 
     private int cellSize() { return GRID_CELL; }
 

@@ -31,7 +31,7 @@ public final class PresetCardWidget extends Button {
         ThumbnailFBOMaker.ensure(preset,selected?preview:null,state.store.thumbnail(preset.id()));
         if(isHovered() && selected && preview!=null) {
             graphics.guiRenderState.addPicturesInPictureState(new TreePictureRenderer.State(preview,(System.nanoTime()%30_000_000_000L)/30_000_000_000f*(float)Math.PI*2,
-                    false,getX()+3,getY()+3,getX()+width-3,getY()+height-3,(float)((width-6)/preview.extent()),graphics.scissorStack.peek()));
+                    getX()+3,getY()+3,getX()+width-3,getY()+height-3,(float)((width-6)/preview.extent()),graphics.scissorStack.peek()));
         } else if(texture!=null) graphics.blit(RenderPipelines.GUI_TEXTURED,texture,getX()+3,getY()+3,0,0,width-6,height-6,128,128,128,128);
         var font=net.minecraft.client.Minecraft.getInstance().font;
         Component label=preset.id().startsWith("builtin-")

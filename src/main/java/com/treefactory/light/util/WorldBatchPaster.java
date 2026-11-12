@@ -17,7 +17,6 @@ import net.minecraft.server.level.*;
 import net.minecraft.network.chat.Component;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.EmptyBlockGetter;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.block.*;
 import net.minecraft.world.level.block.state.BlockState;
@@ -70,6 +69,7 @@ public final class WorldBatchPaster {
     });
     private final CoalescedPersistQueue persistQueue = new CoalescedPersistQueue();
     private MinecraftServer server;
+    private boolean storageUnavailable;
     private boolean dirty;
     private long lastPersistNs;
     @FunctionalInterface
@@ -108,6 +108,7 @@ public final class WorldBatchPaster {
     }
     /** Places (or moves/rebuilds) the player's preview tree. A newer request supersedes any unfinished one. */
     public void preview(ServerPlayer player, BlockPos origin, TreeConfig config) {
+        if (storageUnavailable) { message(player,"treefactory.storage_unavailable"); return; }
         if (!authorized(player)) return;
         UUID id = player.getUUID();
         cancelInFlight(id);
@@ -229,6 +230,11 @@ public final class WorldBatchPaster {
     /** Keeps the current preview tree permanently (after any in-flight rebuild finishes). */
     public void requestCommit(ServerPlayer player, long requestId) {
         commitRequests.put(player.getUUID(), requestId);
+        if (storageUnavailable) {
+            message(player,"treefactory.storage_unavailable");
+            notifyCommitResult(player,false);
+            return;
+        }
         commit(player);
     }
     private void commit(ServerPlayer player) {
@@ -262,6 +268,7 @@ public final class WorldBatchPaster {
         notifyCommitResult(player, true);
     }
     public void undo(ServerPlayer player) {
+        if (storageUnavailable) { message(player,"treefactory.storage_unavailable"); return; }
         if (!authorized(player)) return;
         UUID id=player.getUUID();
         ArrayDeque<CommittedTree> stack=undo.get(id);
@@ -312,7 +319,8 @@ public final class WorldBatchPaster {
     public void disconnect(UUID id) { discard(id); persist(true); }
     public void attach(MinecraftServer server) {
         this.server=server;
-        load();
+        storageUnavailable=!load();
+        if (storageUnavailable) return;
         for (DeferredSession deferred : deferredSessions) restoreAll(deferred.session());
         deferredSessions.removeIf(deferred -> deferred.session().placed.isEmpty());
         persist(true);
@@ -439,9 +447,10 @@ public final class WorldBatchPaster {
         return level.getChunk(SectionPos.blockToSectionCoord(pos.getX()), SectionPos.blockToSectionCoord(pos.getZ()),
                 ChunkStatus.FULL, false) != null;
     }
-    private static boolean replaceable(BlockState state) {
-        return !state.hasBlockEntity() && (state.isAir() || state.canBeReplaced() || state.is(BlockTags.LEAVES)
-                || (state.getCollisionShape(EmptyBlockGetter.INSTANCE,BlockPos.ZERO).isEmpty() && state.getFluidState().isEmpty()));
+    static boolean replaceable(BlockState state) {
+        return !state.hasBlockEntity() && state.getFluidState().isEmpty()
+                && !(state.getBlock() instanceof VineBlock) && !state.is(BlockTags.CLIMBABLE)
+                && (state.isAir() || state.canBeReplaced() || state.getBlock() instanceof LeavesBlock || state.is(BlockTags.LEAVES));
     }
     private static boolean authorized(ServerPlayer p) {
         if (!p.isCreative() || !holdingWand(p)) { message(p,"treefactory.creative_only"); return false; }
@@ -460,7 +469,7 @@ public final class WorldBatchPaster {
      * Returns the scheduled write, or {@code null} if nothing was scheduled.
      */
     private Future<?> persist(boolean immediate) {
-        if (server==null) return null;
+        if (server==null || storageUnavailable) return null;
         if (!immediate) {
             long now=System.nanoTime();
             if (now-lastPersistNs<PERSIST_THROTTLE_NS) { dirty=true; return null; }
@@ -527,21 +536,27 @@ public final class WorldBatchPaster {
         try { Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE); }
         catch (AtomicMoveNotSupportedException e) { Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING); }
     }
-    private void load() {
-        if (server==null) return;
+    private boolean load() {
         Path path=dataFile();
-        if (!Files.isRegularFile(path)) return;
-        CompoundTag root;
-        try { root=NbtIo.readCompressed(path, NbtAccounter.unlimitedHeap()); }
-        catch (IOException e) { TreefactoryLight.LOGGER.warn("Could not load preview state", e); return; }
+        if (!Files.isRegularFile(path)) return true;
+        try {
+            readState(NbtIo.readCompressed(path, NbtAccounter.unlimitedHeap()));
+            return true;
+        } catch (IOException | RuntimeException e) {
+            sessions.clear(); deferredSessions.clear(); undo.clear();
+            TreefactoryLight.LOGGER.error("Could not load preview state from {}; tree previews and undo are disabled to preserve the file",path,e);
+            return false;
+        }
+    }
+    private void readState(CompoundTag root) {
         sessions.clear(); deferredSessions.clear(); undo.clear();
         var lookup=server.registryAccess().lookupOrThrow(Registries.BLOCK);
         ListTag previewsIn=list(root, "previews");
         for (Tag raw : previewsIn) {
-            if (!(raw instanceof CompoundTag tag)) continue;
+            if (!(raw instanceof CompoundTag tag)) throw new IllegalArgumentException("Invalid preview entry");
             UUID id=UUID.fromString(string(tag, "player"));
             ServerLevel world=level(string(tag, "dimension"));
-            if (world==null) continue;
+            if (world==null) throw new IllegalArgumentException("Preview dimension is unavailable");
             Session session=new Session(world);
             session.closing=true;
             readFootprint(lookup, list(tag, "blocks"), session);
@@ -549,12 +564,12 @@ public final class WorldBatchPaster {
         }
         ListTag historyIn=list(root, "undo");
         for (Tag raw : historyIn) {
-            if (!(raw instanceof CompoundTag tag)) continue;
+            if (!(raw instanceof CompoundTag tag)) throw new IllegalArgumentException("Invalid undo entry");
             UUID id=UUID.fromString(string(tag, "player"));
             ArrayDeque<CommittedTree> stack=undo.computeIfAbsent(id, k -> new ArrayDeque<>());
             ListTag entries=list(tag, "entries");
             for (Tag itemRaw : entries) {
-                if (!(itemRaw instanceof CompoundTag item)) continue;
+                if (!(itemRaw instanceof CompoundTag item)) throw new IllegalArgumentException("Invalid undo history item");
                 stack.addLast(new CommittedTree(string(item, "dimension"),
                         readStates(lookup, list(item, "placed")), readStates(lookup, list(item, "original"))));
                 while (stack.size()>PlacementHistory.LIMIT) stack.removeFirst();
@@ -581,10 +596,10 @@ public final class WorldBatchPaster {
     }
     private static void readFootprint(HolderGetter<Block> lookup, ListTag list, Session session) {
         for (Tag raw : list) {
-            if (!(raw instanceof CompoundTag tag)) continue;
+            if (!(raw instanceof CompoundTag tag)) throw new IllegalArgumentException("Invalid preview block");
             BlockPos pos=new BlockPos(integer(tag,"x"), integer(tag,"y"), integer(tag,"z"));
-            session.placed.put(pos, NbtUtils.readBlockState(lookup, compound(tag, "placed")));
-            if (tag.contains("original")) session.original.put(pos, NbtUtils.readBlockState(lookup, compound(tag, "original")));
+            session.placed.put(pos, readBlockState(lookup, compound(tag, "placed")));
+            if (tag.contains("original")) session.original.put(pos, readBlockState(lookup, compound(tag, "original")));
         }
     }
     private static ListTag states(Map<BlockPos,BlockState> blocks) {
@@ -600,22 +615,28 @@ public final class WorldBatchPaster {
     private static Map<BlockPos,BlockState> readStates(HolderGetter<Block> lookup, ListTag list) {
         Map<BlockPos,BlockState> result=new LinkedHashMap<>();
         for (Tag raw : list) {
-            if (!(raw instanceof CompoundTag tag)) continue;
+            if (!(raw instanceof CompoundTag tag)) throw new IllegalArgumentException("Invalid undo block");
             result.put(new BlockPos(integer(tag,"x"), integer(tag,"y"), integer(tag,"z")),
-                    NbtUtils.readBlockState(lookup, compound(tag, "state")));
+                    readBlockState(lookup, compound(tag, "state")));
         }
         return result;
     }
     private static String string(CompoundTag tag, String key) {
-        return tag.getStringOr(key, "");
+        return tag.getString(key).orElseThrow(() -> new IllegalArgumentException("Missing string: "+key));
     }
     private static int integer(CompoundTag tag, String key) {
-        return tag.getIntOr(key, 0);
+        return tag.getInt(key).orElseThrow(() -> new IllegalArgumentException("Missing integer: "+key));
     }
     private static ListTag list(CompoundTag tag, String key) {
-        return tag.getListOrEmpty(key);
+        return tag.getList(key).orElseThrow(() -> new IllegalArgumentException("Missing list: "+key));
     }
     private static CompoundTag compound(CompoundTag tag, String key) {
-        return tag.getCompoundOrEmpty(key);
+        return tag.getCompound(key).orElseThrow(() -> new IllegalArgumentException("Missing compound: "+key));
+    }
+    static BlockState readBlockState(HolderGetter<Block> lookup, CompoundTag tag) {
+        BlockState state=NbtUtils.readBlockState(lookup,tag);
+        if (!NbtUtils.writeBlockState(state).equals(tag))
+            throw new IllegalArgumentException("Invalid or unavailable saved block state: "+tag);
+        return state;
     }
 }

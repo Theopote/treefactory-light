@@ -8,7 +8,7 @@ public record Vector3(double x, double y, double z) {
     public double dot(Vector3 v) { return x * v.x + y * v.y + z * v.z; }
     public double lengthSquared() { return dot(this); }
     public Vector3 normalize() {
-        double length = Math.sqrt(lengthSquared());
+        double length = StrictMath.sqrt(lengthSquared());
         return length < 1e-10 ? ZERO : multiply(1 / length);
     }
 }

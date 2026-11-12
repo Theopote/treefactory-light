@@ -23,7 +23,7 @@ public final class TreePictureRenderer extends PictureInPictureRenderer<TreePict
     public static void orient(PoseStack pose,float yaw) {
         pose.rotate(new Quaternionf().rotationZ((float)Math.PI).rotateX(ELEVATION).rotateY(yaw));
     }
-    public record State(PreviewSnapshot snapshot,float angle,boolean hologram,int x0,int y0,int x1,int y1,float scale,
+    public record State(PreviewSnapshot snapshot,float angle,int x0,int y0,int x1,int y1,float scale,
                         ScreenRectangle scissorArea) implements PictureInPictureRenderState {
         @Override public ScreenRectangle bounds() { return PictureInPictureRenderState.getBounds(x0,y0,x1,y1,scissorArea); }
     }
@@ -33,8 +33,7 @@ public final class TreePictureRenderer extends PictureInPictureRenderer<TreePict
     @Override protected void renderToTexture(State state, @NonNull PoseStack pose, @NonNull SubmitNodeCollector collector) {
         orient(pose,state.angle());
         pose.translate(0,-state.snapshot.centerY(),0);
-        if(state.hologram) collector.submitCustomGeometry(pose,RenderTypes.debugQuads(),(matrix,buffer)->HologramRenderer.draw(state.snapshot,matrix,buffer));
-        else submitBlocks(state.snapshot,pose,collector);
+        submitBlocks(state.snapshot,pose,collector);
     }
     /** Uses the current resource pack's baked block models rather than placeholder thumbnail geometry. */
     public static void submitBlocks(PreviewSnapshot snapshot,PoseStack pose,SubmitNodeCollector collector) {

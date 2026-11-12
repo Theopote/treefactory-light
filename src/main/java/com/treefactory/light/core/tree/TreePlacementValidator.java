@@ -4,7 +4,7 @@ import com.treefactory.light.core.algorithm.Voxelizer;
 import java.util.*;
 import java.util.function.Predicate;
 
-/** Pre-placement filter: blocked cells are skipped; placement fails only if no woody block can be placed. */
+/** Filters blocked cells and, when wood is blocked, keeps only the rooted tree. */
 public final class TreePlacementValidator {
     public record Result(boolean ok, String messageKey, Map<Cell, Voxelizer.Material> placeable) {
         public static Result ok(Map<Cell, Voxelizer.Material> placeable) {
@@ -27,19 +27,50 @@ public final class TreePlacementValidator {
             Predicate<Cell> canInteract, Predicate<Cell> replaceable) {
         Map<Cell, Voxelizer.Material> placeable = new LinkedHashMap<>();
         String firstBlock = null;
-        boolean anyWoody = false;
+        boolean anyWoody = false, blockedWood = false;
+        Cell origin=new Cell(0,0,0);
+        String originBlock=null;
         for (var entry : blocks.entrySet()) {
             Cell cell = entry.getKey();
             Voxelizer.Material material = entry.getValue();
             String blocked = accessibility.apply(cell);
             // Occupied, protected or unloaded cells are simply skipped; the tree grows around obstacles.
             if (blocked == null && canInteract.test(cell) && replaceable.test(cell)) placeable.put(cell, material);
-            else if (material.woody() && firstBlock == null)
-                firstBlock = blocked != null ? blocked : "treefactory.target_protected";
+            else if (material.woody()) {
+                blockedWood=true;
+                String reason=blocked != null ? blocked : "treefactory.target_protected";
+                if (firstBlock == null) firstBlock=reason;
+                if (cell.equals(origin)) originBlock=reason;
+            }
             anyWoody |= material.woody();
         }
         if (placeable.values().stream().noneMatch(Voxelizer.Material::woody))
             return Result.fail(anyWoody && firstBlock != null ? firstBlock : "treefactory.tree_incomplete");
+        if (blockedWood) {
+            Voxelizer.Material root=placeable.get(origin);
+            if (root == null || !root.woody())
+                return Result.fail(originBlock != null ? originBlock : "treefactory.tree_incomplete");
+            Set<Cell> reachable=new HashSet<>();
+            ArrayDeque<Cell> queue=new ArrayDeque<>();
+            reachable.add(origin); queue.add(origin);
+            flood(queue, reachable, placeable, true);
+            queue.addAll(reachable);
+            flood(queue, reachable, placeable, false);
+            placeable.keySet().removeIf(cell -> !reachable.contains(cell));
+        }
         return Result.ok(placeable);
+    }
+
+    private static void flood(ArrayDeque<Cell> queue, Set<Cell> reachable,
+            Map<Cell,Voxelizer.Material> cells, boolean wood) {
+        int[][] offsets={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
+        while (!queue.isEmpty()) {
+            Cell pos=queue.removeFirst();
+            for (int[] offset : offsets) {
+                Cell next=new Cell(pos.x()+offset[0],pos.y()+offset[1],pos.z()+offset[2]);
+                Voxelizer.Material material=cells.get(next);
+                if (material != null && material.woody()==wood && reachable.add(next)) queue.addLast(next);
+            }
+        }
     }
 }

@@ -195,6 +195,7 @@ public final class ClientTreeState {
         active=false; target=null; placeDirty=false; previewOrigin=null;
     }
     public void undo() {
+        if(!holdingWand()) return;
         if(!ClientPlayNetworking.canSend(C2SUndoTreePacket.TYPE)) { toast("treefactory.no_server"); return; }
         ClientPlayNetworking.send(new C2SUndoTreePacket());
     }

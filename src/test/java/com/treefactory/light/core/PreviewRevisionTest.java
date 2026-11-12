@@ -6,6 +6,18 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class PreviewRevisionTest {
+    @Test void unappliedAndMissingRevisionsCannotCommit() {
+        PreviewRevision revisions=new PreviewRevision();
+        UUID player=UUID.randomUUID();
+        assertFalse(revisions.isAppliedCurrent(player));
+        assertFalse(revisions.readyToCommit(player));
+        assertEquals(1,revisions.next(player));
+        assertFalse(revisions.readyToCommit(player));
+        revisions.markApplied(player,1);
+        assertTrue(revisions.readyToCommit(player));
+        revisions.clear(player);
+        assertFalse(revisions.readyToCommit(player));
+    }
     @Test void commitOnlyMatchesLatestAppliedRevision() {
         PreviewRevision revisions = new PreviewRevision();
         UUID player = UUID.randomUUID();

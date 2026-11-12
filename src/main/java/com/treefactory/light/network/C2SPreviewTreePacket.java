@@ -8,11 +8,21 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.Identifier;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
-public record C2SPreviewTreePacket(BlockPos origin, TreeConfig config) implements CustomPacketPayload {
+public record C2SPreviewTreePacket(BlockPos origin, @Nullable TreeConfig config, @Nullable String validationError) implements CustomPacketPayload {
+    public C2SPreviewTreePacket(BlockPos origin, TreeConfig config) {
+        this(origin,java.util.Objects.requireNonNull(config),null);
+    }
+    public C2SPreviewTreePacket {
+        java.util.Objects.requireNonNull(origin);
+        if ((config == null) == (validationError == null))
+            throw new IllegalArgumentException("Expected either a preview configuration or a validation error");
+    }
     public static final Type<C2SPreviewTreePacket> TYPE = new Type<>(Identifier.fromNamespaceAndPath(TreefactoryLight.MOD_ID, "preview_tree_v4"));
     public static final StreamCodec<RegistryFriendlyByteBuf,C2SPreviewTreePacket> CODEC = CustomPacketPayload.codec(C2SPreviewTreePacket::write,C2SPreviewTreePacket::read);
     private void write(RegistryFriendlyByteBuf b) {
+        if (config==null) throw new IllegalStateException("Cannot send an invalid preview");
         b.writeBlockPos(origin); writeEnum(b,config.treeType()); b.writeDouble(config.trunkHeight()); b.writeLong(config.seed());
         b.writeDouble(config.crookedness()); b.writeDouble(config.spread()); b.writeDouble(config.fullness());
         writeEnum(b,config.canopyShape()); b.writeDouble(config.canopyScale()); b.writeDouble(config.attractionDensity()); b.writeDouble(config.pipeExponent()); b.writeDouble(config.trunkThickness());
@@ -30,9 +40,16 @@ public record C2SPreviewTreePacket(BlockPos origin, TreeConfig config) implement
         CanopyShape shape=readEnum(b,CanopyShape.class); double crownScale=b.readDouble(), density=b.readDouble(), exponent=b.readDouble(), thickness=b.readDouble();
         double stretch=b.readDouble(); int layers=b.readVarInt(); double crownBase=b.readDouble();
         double angleBias=b.readDouble(), droop=b.readDouble(), apical=b.readDouble(), gravity=b.readDouble();
-        BlockPalette palette=new BlockPalette(b.readUtf(128),b.readUtf(128),b.readUtf(128),b.readUtf(128),b.readUtf(128),b.readUtf(128),
-                b.readDouble(),b.readDouble(),b.readDouble());
-        return new C2SPreviewTreePacket(origin,new TreeConfig(preset,seed,crooked,spread,fullness,shape,crownScale,density,exponent,palette,height,thickness,stretch,layers,angleBias,droop,apical,gravity,crownBase));
+        String main=b.readUtf(128), thick=b.readUtf(128), thin=b.readUtf(128);
+        String primary=b.readUtf(128), secondary=b.readUtf(128), accent=b.readUtf(128);
+        double primaryWeight=b.readDouble(), secondaryWeight=b.readDouble(), accentWeight=b.readDouble();
+        try {
+            BlockPalette palette=new BlockPalette(main,thick,thin,primary,secondary,accent,
+                    primaryWeight,secondaryWeight,accentWeight);
+            return new C2SPreviewTreePacket(origin,new TreeConfig(preset,seed,crooked,spread,fullness,shape,crownScale,density,exponent,palette,height,thickness,stretch,layers,angleBias,droop,apical,gravity,crownBase));
+        } catch (IllegalArgumentException error) {
+            return new C2SPreviewTreePacket(origin,null,error.getMessage() != null ? error.getMessage() : "Invalid preview configuration");
+        }
     }
     private static <E extends Enum<E>> void writeEnum(RegistryFriendlyByteBuf b, E value) {
         b.writeById(Enum::ordinal, value);

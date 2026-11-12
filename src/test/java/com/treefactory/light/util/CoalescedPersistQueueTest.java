@@ -8,6 +8,40 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CoalescedPersistQueueTest {
+    @Test void laterSnapshotFutureWaitsUntilItsWriteCompletes() throws Exception {
+        CoalescedPersistQueue queue=new CoalescedPersistQueue();
+        ExecutorService executor=Executors.newSingleThreadExecutor();
+        CountDownLatch firstStarted=new CountDownLatch(1), releaseFirst=new CountDownLatch(1);
+        CountDownLatch secondStarted=new CountDownLatch(1), releaseSecond=new CountDownLatch(1);
+        try {
+            CoalescedPersistQueue.PersistWriter writer=snapshot -> {
+                if ((int)snapshot==1) { firstStarted.countDown(); releaseFirst.await(); }
+                else { secondStarted.countDown(); releaseSecond.await(); }
+            };
+            queue.enqueue(1,writer,executor);
+            assertTrue(firstStarted.await(5,TimeUnit.SECONDS));
+            CompletableFuture<Void> later=queue.enqueue(2,writer,executor);
+            releaseFirst.countDown();
+            assertTrue(secondStarted.await(5,TimeUnit.SECONDS));
+            assertFalse(later.isDone());
+            releaseSecond.countDown();
+            later.get(5,TimeUnit.SECONDS);
+            assertEquals(2,queue.writtenGeneration());
+        } finally {
+            releaseFirst.countDown(); releaseSecond.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test void executorRejectionFailsFutureAndCanBeRetried() throws Exception {
+        CoalescedPersistQueue queue=new CoalescedPersistQueue();
+        Executor rejected=task -> { throw new RejectedExecutionException("closed"); };
+        var failed=queue.enqueue(1,snapshot -> {},rejected);
+        assertInstanceOf(RejectedExecutionException.class,
+                assertThrows(ExecutionException.class, () -> failed.get()).getCause());
+        queue.enqueue(2,snapshot -> assertEquals(2,snapshot),Runnable::run).get();
+        assertEquals(0,queue.pendingGenerations());
+    }
     @Test void burstEnqueuesWriteOnlyTheLatestSnapshot() throws Exception {
         CoalescedPersistQueue queue = new CoalescedPersistQueue();
         ExecutorService executor = Executors.newSingleThreadExecutor();

@@ -43,7 +43,12 @@ public class TreefactoryLight implements ModInitializer {
 		PASTER.setCommitNotifier((player, requestId, success) ->
 				ServerPlayNetworking.send(player, new S2CTreeCommitResultPacket(requestId, success)));
 		ServerPlayNetworking.registerGlobalReceiver(C2SPreviewTreePacket.TYPE,(packet,context) ->
-				context.server().execute(() -> PASTER.preview(context.player(),packet.origin(),packet.config())));
+				context.server().execute(() -> {
+					if (packet.config() == null) {
+						LOGGER.warn("Rejected invalid preview configuration: {}", packet.validationError());
+						context.player().sendOverlayMessage(net.minecraft.network.chat.Component.translatable("treefactory.invalid_preview"));
+					} else PASTER.preview(context.player(),packet.origin(),packet.config());
+				}));
 		ServerPlayNetworking.registerGlobalReceiver(C2SEndPreviewPacket.TYPE,(packet,context) ->
 				context.server().execute(() -> {
 					if (packet.commit()) PASTER.requestCommit(context.player(), packet.requestId()); else PASTER.discard(context.player().getUUID());
