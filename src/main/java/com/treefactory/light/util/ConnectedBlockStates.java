@@ -10,6 +10,7 @@ import net.minecraft.world.level.block.PipeBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.util.function.Function;
@@ -23,9 +24,9 @@ public final class ConnectedBlockStates {
 
     public static BlockGetter view(BlockGetter bounds, Function<BlockPos,BlockState> states) {
         return new BlockGetter() {
-            @Override public @Nullable BlockEntity getBlockEntity(BlockPos pos) { return null; }
-            @Override public BlockState getBlockState(BlockPos pos) { return states.apply(pos); }
-            @Override public FluidState getFluidState(BlockPos pos) { return getBlockState(pos).getFluidState(); }
+            @Override public @Nullable BlockEntity getBlockEntity(@NonNull BlockPos pos) { return null; }
+            @Override public @NonNull BlockState getBlockState(@NonNull BlockPos pos) { return states.apply(pos); }
+            @Override public @NonNull FluidState getFluidState(@NonNull BlockPos pos) { return getBlockState(pos).getFluidState(); }
             @Override public int getHeight() { return bounds.getHeight(); }
             @Override public int getMinY() { return bounds.getMinY(); }
         };
