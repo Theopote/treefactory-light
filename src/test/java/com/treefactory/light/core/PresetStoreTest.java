@@ -41,6 +41,11 @@ class PresetStoreTest {
         assertFalse(structure.has("pipe_exponent"));
         assertEquals(config,PresetStore.decode("id",json).config());
     }
+    @Test void minimumDensityRoundTrips() {
+        var defaults=TreeConfig.defaults();
+        var config=defaults.withCanopy(defaults.canopyShape(),defaults.canopyScale(),.1);
+        assertEquals(config,PresetStore.decode("id",PresetStore.encode("Oak","Player",config)).config());
+    }
     @Test void recentlyModifiedPresetsAppearFirst() throws Exception {
         PresetStore store=new PresetStore(directory);
         var older=store.save("Older","Player",TreeConfig.defaults());

@@ -19,7 +19,7 @@ public record BlockPalette(String mainTrunk, String thickBranch, String thinBran
     }
     public static BlockPalette defaults(String wood) {
         String log="minecraft:"+wood+"_log";
-        return new BlockPalette(log, log, log, "minecraft:"+wood+"_leaves",
+        return new BlockPalette(log, log, "minecraft:"+wood+"_fence", "minecraft:"+wood+"_leaves",
                 "minecraft:flowering_azalea_leaves", "minecraft:moss_block", .96, .02, .02);
     }
     public BlockPalette withBlocks(String main,String thick,String thin,String primary,String secondary,String accent) {

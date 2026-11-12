@@ -1,5 +1,6 @@
 package com.treefactory.light.util;
 
+import com.treefactory.light.core.config.BuiltInPresets;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -35,11 +36,22 @@ class FenceConnectionsTest {
         originalTags=new HashMap<>();
         registry.getTags().forEach(tag -> originalTags.put(tag.key(),tag.stream().toList()));
         var tags=new HashMap<>(originalTags);
-        tags.put(BlockTags.FENCES,List.of(registry.wrapAsHolder(Blocks.OAK_FENCE),
-                registry.wrapAsHolder(Blocks.BIRCH_FENCE),registry.wrapAsHolder(Blocks.NETHER_BRICK_FENCE)));
-        tags.put(BlockTags.WOODEN_FENCES,List.of(registry.wrapAsHolder(Blocks.OAK_FENCE),
-                registry.wrapAsHolder(Blocks.BIRCH_FENCE)));
+        var woodFences=List.of(Blocks.OAK_FENCE,Blocks.SPRUCE_FENCE,Blocks.BIRCH_FENCE,
+                Blocks.CHERRY_FENCE,Blocks.ACACIA_FENCE,Blocks.DARK_OAK_FENCE,Blocks.JUNGLE_FENCE,
+                Blocks.MANGROVE_FENCE,Blocks.PALE_OAK_FENCE).stream().map(registry::wrapAsHolder).toList();
+        var fences=new java.util.ArrayList<>(woodFences);
+        fences.add(registry.wrapAsHolder(Blocks.NETHER_BRICK_FENCE));
+        tags.put(BlockTags.FENCES,fences);
+        tags.put(BlockTags.WOODEN_FENCES,woodFences);
         registry.prepareTagReload(new TagLoader.LoadResult<>(registry.key(),tags)).apply();
+    }
+
+    @Test void allBuiltInDefaultFencesResolveForThinBranches() {
+        for (var preset : BuiltInPresets.all()) {
+            String id=preset.config().blockPalette().thinBranch();
+            assertTrue(PaletteRules.resolve(PaletteRules.Role.THIN_BRANCH,id).getBlock()
+                    instanceof net.minecraft.world.level.block.FenceBlock,preset.id());
+        }
     }
 
     @AfterAll static void restoreTags() {

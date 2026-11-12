@@ -34,7 +34,7 @@ class CrownPositionTest {
                         for (double stretch : new double[] {.6,1,2}) {
                             var config=TreeConfig.defaults().withTrunkHeight(height)
                                     .withCanopy(shape,size,1.25).withCrownLayers(layers).withCrownStretch(stretch);
-                            assertEquals(height*1.1,config.crownTopHeight(),1e-9);
+                            assertEquals(height*1.1,config.withCrownStretch(1).crownTopHeight(),1e-9);
                             assertEquals(config.crownTopHeight(),config.crownCenterHeight()
                                     +shape.crownMaxY(layers)*config.crownVerticalScale(),1e-9,shape.name());
                             assertTrue(config.crownBaseHeight()>=-1e-9,shape.name());

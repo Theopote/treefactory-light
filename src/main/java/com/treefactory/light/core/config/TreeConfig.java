@@ -11,7 +11,7 @@ public record TreeConfig(TreeType treeType, long seed,
                          double branchAngleBias, double branchDroop, double apicalDominance,
                          double gravityInfluence) {
     public static final double MIN_HEIGHT=6, MAX_HEIGHT=48, MIN_THICKNESS=.5, MAX_THICKNESS=2.0, MIN_STRETCH=.6, MAX_STRETCH=2.0;
-    public static final double MIN_CANOPY_SCALE=.75, MAX_CANOPY_SCALE=2.0, MIN_DENSITY=.5, MAX_DENSITY=2.0,
+    public static final double MIN_CANOPY_SCALE=.75, MAX_CANOPY_SCALE=2.0, MIN_DENSITY=.1, MAX_DENSITY=2.0,
             MIN_TAPER=0, MAX_TAPER=1;
     public static final int MIN_LAYERS=3, MAX_LAYERS=6;
     public static final double DEFAULT_BRANCH_ANGLE_BIAS=.5, DEFAULT_BRANCH_DROOP=0, DEFAULT_APICAL_DOMINANCE=.5,
@@ -85,17 +85,21 @@ public record TreeConfig(TreeType treeType, long seed,
     public TreeConfig withGravityInfluence(double value) {
         return withMorphology(branchAngleBias,branchDroop,apicalDominance,value);
     }
-    public double crownTopHeight() { return trunkHeight*1.1; }
-    public double crownVerticalScale() {
-        double requested=trunkHeight*(canopyShape==CanopyShape.SPHERE ? .448 : .38)*canopyScale*crownStretch;
+    private double baseVerticalScale() {
+        double requested=trunkHeight*(canopyShape==CanopyShape.SPHERE ? .448 : .38)*canopyScale;
         double span=canopyShape.crownMaxY(crownLayers)-canopyShape.crownMinY(crownLayers);
-        return Math.min(requested,crownTopHeight()/span);
+        return Math.min(requested,trunkHeight*1.1/span);
+    }
+    public double crownVerticalScale() { return baseVerticalScale()*crownStretch; }
+    public double crownBaseHeight() {
+        return trunkHeight*1.1-(canopyShape.crownMaxY(crownLayers)-canopyShape.crownMinY(crownLayers))
+                *baseVerticalScale()*Math.min(1,crownStretch);
     }
     public double crownCenterHeight() {
-        return crownTopHeight()-canopyShape.crownMaxY(crownLayers)*crownVerticalScale();
+        return crownBaseHeight()-canopyShape.crownMinY(crownLayers)*crownVerticalScale();
     }
-    public double crownBaseHeight() {
-        return crownCenterHeight()+canopyShape.crownMinY(crownLayers)*crownVerticalScale();
+    public double crownTopHeight() {
+        return crownCenterHeight()+canopyShape.crownMaxY(crownLayers)*crownVerticalScale();
     }
     public int trunkSegments() { return (int)Math.ceil(trunkHeight); }
 }

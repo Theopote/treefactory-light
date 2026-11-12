@@ -40,6 +40,22 @@ class ParameterBehaviorTest {
         assertTrue(bias.allowDownward());
     }
 
+    @Test void attractionDensityAcceptsEndpointsAndGeneratesSparseTrees() {
+        var config=TreeConfig.defaults();
+        assertEquals(.1,TreeConfig.MIN_DENSITY);
+        assertEquals(2,TreeConfig.MAX_DENSITY);
+        var low=config.withCanopy(config.canopyShape(),config.canopyScale(),.1);
+        var high=config.withCanopy(config.canopyShape(),config.canopyScale(),2);
+        assertThrows(IllegalArgumentException.class,() -> config.withCanopy(config.canopyShape(),config.canopyScale(),.099));
+        assertThrows(IllegalArgumentException.class,() -> config.withCanopy(config.canopyShape(),config.canopyScale(),2.001));
+        var colonizer=new SpaceColonizer();
+        var lowNodes=colonizer.generate(low);
+        var highNodes=colonizer.generate(high);
+        assertTrue(lowNodes.size()>low.trunkSegments()+1);
+        assertTrue(highNodes.size()>lowNodes.size());
+        assertFalse(new TreeBuildTask().build(low,() -> false).blocks().isEmpty());
+    }
+
     @Test void taperChangesMediumTreeBranches() {
         var config=TreeConfig.defaults();
         var skeleton=new SpaceColonizer().generate(config);

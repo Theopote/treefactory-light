@@ -4,8 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Presets shipped with the mod. A preset's id is also its thumbnail cache name, so changing the config
- * of an existing id would leave a stale thumbnail on disk: give a changed tree a new id instead.
+ * Presets shipped with the mod. Invalidate the thumbnail cache when changing existing preset configurations.
  */
 public final class BuiltInPresets {
     public static final String PREFIX = "builtin-";
@@ -52,8 +51,9 @@ public final class BuiltInPresets {
     }
 
     private static BlockPalette palette(String wood, String secondaryLeaf, double primary, double secondary, double accent) {
-        String log = "minecraft:" + wood + "_log";
-        return new BlockPalette(log, log, log, "minecraft:" + wood + "_leaves",
-                "minecraft:" + secondaryLeaf + "_leaves", "minecraft:moss_block", primary, secondary, accent);
+        var defaults=BlockPalette.defaults(wood);
+        return defaults.withBlocks(defaults.mainTrunk(),defaults.thickBranch(),defaults.thinBranch(),
+                defaults.primaryLeaf(),"minecraft:" + secondaryLeaf + "_leaves",defaults.accentBlock())
+                .withWeights(primary,secondary,accent);
     }
 }
