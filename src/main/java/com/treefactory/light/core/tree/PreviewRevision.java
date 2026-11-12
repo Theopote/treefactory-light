@@ -16,8 +16,6 @@ public final class PreviewRevision {
 
     public long latest(UUID player) { return latest.getOrDefault(player, 0L); }
 
-    public long applied(UUID player) { return applied.getOrDefault(player, 0L); }
-
     public void markApplied(UUID player, long revision) { applied.put(player, revision); }
 
     public void requestCommit(UUID player, long revision) { commitTarget.put(player, revision); }

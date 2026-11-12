@@ -1,7 +1,6 @@
 package com.treefactory.light.client.gui.render;
 
 import com.treefactory.light.client.PreviewSnapshot;
-import com.treefactory.light.core.algorithm.Voxelizer;
 import com.treefactory.light.util.WorldBatchPaster;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;

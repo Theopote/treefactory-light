@@ -23,13 +23,13 @@ class TreeAlgorithmsTest {
         }
         assertTrue(branched);
     }
-    @Test void pipeModelMatchesMurrayLaw() {
+    @Test void pipeModelKeepsTipsAndValidatesTopology() {
         var result=new PipeModelEngine().apply(List.of(new TreeNode(Vector3.ZERO,-1,0),
-                new TreeNode(new Vector3(1,1,0),0,0),new TreeNode(new Vector3(-1,1,0),0,0)));
+                new TreeNode(new Vector3(1,1,0),0,0),new TreeNode(new Vector3(-1,1,0),0,0)),TreeConfig.defaults());
         assertEquals(.5,result.get(1).radius());
-        assertEquals(Math.pow(2*Math.pow(.5,2.75),1/2.75),result.getFirst().radius(),1e-12);
-        assertTrue(result.getFirst().radius()<.7);
-        assertThrows(IllegalArgumentException.class,()->new PipeModelEngine().apply(List.of(new TreeNode(Vector3.ZERO,0,1))));
+        assertTrue(result.getFirst().radius()>.5);
+        assertTrue(result.getFirst().radius()<=1);
+        assertThrows(IllegalArgumentException.class,()->new PipeModelEngine().apply(List.of(new TreeNode(Vector3.ZERO,0,1)),TreeConfig.defaults()));
     }
     @Test void frustumUsesInterpolatedRadiusAndHandlesDegenerateSegments() {
         Voxelizer v=new Voxelizer(); Vector3 a=Vector3.ZERO,b=new Vector3(0,10,0);

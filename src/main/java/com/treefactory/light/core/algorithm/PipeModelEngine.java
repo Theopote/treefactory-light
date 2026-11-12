@@ -5,9 +5,6 @@ import com.treefactory.light.core.config.TreeConfig;
 import java.util.*;
 
 public final class PipeModelEngine {
-    public List<TreeNode> apply(List<TreeNode> skeleton) {
-        return apply(skeleton,2.75);
-    }
     /**
      * Radius = blend of (a) the pipe-model radius, soft-capped so ordering survives above the cap instead of being
      * clipped to one value, and (b) a length-based taper from the distance to the farthest tip. Both are monotone
@@ -36,22 +33,5 @@ public final class PipeModelEngine {
             fin[i]=Math.max(.5,Math.min(cap*t,r*t)); out.set(i,node.withRadius(fin[i]));
         }
         return List.copyOf(out);
-    }
-    public List<TreeNode> apply(List<TreeNode> skeleton,double exponent) {
-        return apply(skeleton,exponent,Double.POSITIVE_INFINITY);
-    }
-    private List<TreeNode> apply(List<TreeNode> skeleton,double exponent,double maxRadius) {
-        if (!Double.isFinite(exponent) || exponent<2.5 || exponent>3) throw new IllegalArgumentException("Invalid pipe exponent");
-        double[] sums = new double[skeleton.size()];
-        List<TreeNode> result = new ArrayList<>(skeleton);
-        for (int i=skeleton.size()-1; i>=0; i--) {
-            TreeNode node = skeleton.get(i);
-            if (node.parent() >= i || node.parent() < -1) throw new IllegalArgumentException("Invalid tree topology");
-            // No additive radius per generation: that compounded through deep branching.
-            double radius = Math.min(maxRadius,sums[i] == 0 ? .5 : StrictMath.pow(sums[i],1/exponent));
-            result.set(i,node.withRadius(radius));
-            if (node.parent() >= 0) sums[node.parent()] += StrictMath.pow(radius,exponent);
-        }
-        return List.copyOf(result);
     }
 }

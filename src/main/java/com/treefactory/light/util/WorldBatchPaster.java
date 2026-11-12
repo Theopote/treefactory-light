@@ -1,7 +1,6 @@
 package com.treefactory.light.util;
 
 import com.treefactory.light.TreefactoryLight;
-import com.treefactory.light.core.tree.PlacementHistory;
 import com.treefactory.light.core.tree.PreviewRevision;
 import com.treefactory.light.core.tree.TreePlacementValidator;
 import com.treefactory.light.core.tree.UndoPlanner;
@@ -39,6 +38,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class WorldBatchPaster {
     private static final int FLAGS = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE; // 2 | 16
     private static final int MAX_BUILDS = 4;
+    private static final int UNDO_LIMIT = 5;
     private static final long THROTTLE_NS = 150_000_000L;
     private static final long PERSIST_THROTTLE_NS = 2_000_000_000L; // batches frequent preview-footprint writes
     /** Farthest distance, in blocks, at which a preview tree may be placed; the client ray uses the same limit. */
@@ -261,7 +261,7 @@ public final class WorldBatchPaster {
         ArrayDeque<CommittedTree> stack=undo.computeIfAbsent(id, k -> new ArrayDeque<>());
         stack.addLast(new CommittedTree(session.level.dimension().identifier().toString(),
                 committed.placed(), committed.original()));
-        while (stack.size()>PlacementHistory.LIMIT) stack.removeFirst();
+        trimUndoHistory(stack);
         revisions.clear(id);
         persist(true);
         player.sendSystemMessage(Component.translatable("treefactory.built",committed.placed().size()),false);
@@ -572,7 +572,7 @@ public final class WorldBatchPaster {
                 if (!(itemRaw instanceof CompoundTag item)) throw new IllegalArgumentException("Invalid undo history item");
                 stack.addLast(new CommittedTree(string(item, "dimension"),
                         readStates(lookup, list(item, "placed")), readStates(lookup, list(item, "original"))));
-                while (stack.size()>PlacementHistory.LIMIT) stack.removeFirst();
+                trimUndoHistory(stack);
             }
         }
     }
@@ -581,6 +581,9 @@ public final class WorldBatchPaster {
         for (ServerLevel level : server.getAllLevels())
             if (level.dimension().identifier().equals(identifier)) return level;
         return null;
+    }
+    static void trimUndoHistory(Deque<?> stack) {
+        while (stack.size()>UNDO_LIMIT) stack.removeFirst();
     }
     private static ListTag footprint(Map<BlockPos,BlockState> placed, Map<BlockPos,BlockState> original) {
         ListTag list=new ListTag();

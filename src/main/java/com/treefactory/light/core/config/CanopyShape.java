@@ -1,6 +1,6 @@
 package com.treefactory.light.core.config;
 
-public enum CanopyShape implements ICanopyShape {
+public enum CanopyShape {
     ELLIPSOID {
         public double field(double x,double y,double z) { return x*x+y*y+z*z-1; }
     },
@@ -77,6 +77,7 @@ public enum CanopyShape implements ICanopyShape {
             return Math.max(Math.abs(y)-1,StrictMath.hypot(x,z)-radius);
         }
     };
+    public abstract double field(double x,double y,double z);
     /** Shapes other than the layered spindle ignore the layer count. */
     public double field(double x,double y,double z,int layers) { return field(x,y,z); }
     /** Vertical stretch applies independently of horizontal spread. */
