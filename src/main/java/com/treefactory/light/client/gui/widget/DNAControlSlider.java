@@ -16,19 +16,20 @@ public final class DNAControlSlider extends AbstractSliderButton {
     }
     @Override protected void updateMessage() {
         Object shown=switch(key) {
-            case "treefactory.canopy_scale","treefactory.canopy_size" -> String.format(Locale.ROOT,"%.2f",.75+1.25*value);
-            case "treefactory.attraction_density" -> String.format(Locale.ROOT,"%.2f",.5+1.5*value);
-            case "treefactory.pipe_exponent" -> String.format(Locale.ROOT,"%.2f",2.5+.5*value);
-            case "treefactory.trunk_thickness" -> String.format(Locale.ROOT,"%.2f",.5+1.5*value);
-            case "treefactory.crown_stretch" -> String.format(Locale.ROOT,"%.2f",.6+1.4*value);
-            case "treefactory.crown_offset" -> (int)Math.round((TreeConfig.MIN_CROWN_BASE
+            case "treefactory.canopy_size" -> String.format(Locale.ROOT,"%.2f",interpolate(TreeConfig.MIN_CANOPY_SCALE,TreeConfig.MAX_CANOPY_SCALE));
+            case "treefactory.attraction_density" -> String.format(Locale.ROOT,"%.2f",interpolate(TreeConfig.MIN_DENSITY,TreeConfig.MAX_DENSITY));
+            case "treefactory.pipe_exponent" -> String.format(Locale.ROOT,"%.2f",interpolate(TreeConfig.MIN_PIPE_EXPONENT,TreeConfig.MAX_PIPE_EXPONENT));
+            case "treefactory.trunk_thickness" -> String.format(Locale.ROOT,"%.2f",interpolate(TreeConfig.MIN_THICKNESS,TreeConfig.MAX_THICKNESS));
+            case "treefactory.crown_stretch" -> String.format(Locale.ROOT,"%.2f",interpolate(TreeConfig.MIN_STRETCH,TreeConfig.MAX_STRETCH));
+            case "treefactory.crown_base" -> (int)Math.round((TreeConfig.MIN_CROWN_BASE
                     +(TreeConfig.MAX_CROWN_BASE-TreeConfig.MIN_CROWN_BASE)*value)*100);
-            case "treefactory.crown_layers" -> 3+(int)Math.round(3*value);
+            case "treefactory.crown_layers" -> TreeConfig.MIN_LAYERS+(int)Math.round((TreeConfig.MAX_LAYERS-TreeConfig.MIN_LAYERS)*value);
             case "treefactory.gravity_influence" -> (int)Math.round(value*100);
             default -> (int)Math.round(value*100);
         };
         setMessage(Component.translatable(key,shown));
     }
+    private double interpolate(double min,double max) { return min+(max-min)*value; }
     public void sync(double newValue) { value=newValue; updateMessage(); }
     @Override protected void applyValue() { changed.accept(value); }
 }

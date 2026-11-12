@@ -17,8 +17,9 @@ public final class PresetCardWidget extends Button {
         Component name=preset.id().startsWith("builtin-")
                 ? Component.translatable("treefactory.builtin."+preset.id().substring("builtin-".length()))
                 : Component.literal(preset.name());
-        setTooltip(Tooltip.create(name.copy().append("\n")
-                .append(Component.translatable("treefactory.preset."+preset.config().preset().id()))));
+        setTooltip(Tooltip.create(preset.id().startsWith("builtin-") ? name
+                : name.copy().append(" [").append(preset.id()).append("]\n")
+                        .append(Component.translatable("treefactory.preset.delete_hint"))));
     }
     @Override protected void extractContents(GuiGraphicsExtractor graphics,int mouseX,int mouseY,float delta) {
         var state=ClientTreeState.INSTANCE;
@@ -32,5 +33,12 @@ public final class PresetCardWidget extends Button {
             graphics.guiRenderState.addPicturesInPictureState(new TreePictureRenderer.State(preview,(System.nanoTime()%30_000_000_000L)/30_000_000_000f*(float)Math.PI*2,
                     false,getX()+3,getY()+3,getX()+width-3,getY()+height-3,(float)((width-6)/preview.extent()),graphics.scissorStack.peek()));
         } else if(texture!=null) graphics.blit(RenderPipelines.GUI_TEXTURED,texture,getX()+3,getY()+3,0,0,width-6,height-6,128,128,128,128);
+        var font=net.minecraft.client.Minecraft.getInstance().font;
+        Component label=preset.id().startsWith("builtin-")
+                ? Component.translatable("treefactory.builtin."+preset.id().substring("builtin-".length()))
+                : Component.literal(preset.name());
+        String text=font.plainSubstrByWidth(label.getString(), Math.max(0,width-8));
+        graphics.fill(getX()+2,getY()+height-13,getX()+width-2,getY()+height-2,0xC010201B);
+        graphics.text(font,text,getX()+4,getY()+height-12,0xFFFFFFFF);
     }
 }

@@ -11,6 +11,8 @@ public record TreeConfig(TreePreset preset, TreeScale scale, long seed,
                          double branchAngleBias, double branchDroop, double apicalDominance,
                          double gravityInfluence, double crownBase) {
     public static final double MIN_HEIGHT=6, MAX_HEIGHT=48, MIN_THICKNESS=.5, MAX_THICKNESS=2.0, MIN_STRETCH=.6, MAX_STRETCH=2.0;
+    public static final double MIN_CANOPY_SCALE=.75, MAX_CANOPY_SCALE=2.0, MIN_DENSITY=.5, MAX_DENSITY=2.0,
+            MIN_PIPE_EXPONENT=2.5, MAX_PIPE_EXPONENT=3.0;
     public static final int MIN_LAYERS=3, MAX_LAYERS=6;
     public static final double DEFAULT_BRANCH_ANGLE_BIAS=.5, DEFAULT_BRANCH_DROOP=0, DEFAULT_APICAL_DOMINANCE=.5,
             DEFAULT_GRAVITY_INFLUENCE=.5, MIN_CROWN_BASE=.1, MAX_CROWN_BASE=.7, DEFAULT_CROWN_BASE=.3;
@@ -20,7 +22,7 @@ public record TreeConfig(TreePreset preset, TreeScale scale, long seed,
         unit(crookedness); unit(spread); unit(fullness);
         unit(branchAngleBias); unit(branchDroop); unit(apicalDominance); unit(gravityInfluence);
         Objects.requireNonNull(canopyShape); Objects.requireNonNull(blockPalette);
-        range(height,MIN_HEIGHT,MAX_HEIGHT); range(canopyScale,.75,2.0); range(attractionDensity,.5,2.0); range(pipeExponent,2.5,3.0); range(trunkThickness,MIN_THICKNESS,MAX_THICKNESS);
+        range(height,MIN_HEIGHT,MAX_HEIGHT); range(canopyScale,MIN_CANOPY_SCALE,MAX_CANOPY_SCALE); range(attractionDensity,MIN_DENSITY,MAX_DENSITY); range(pipeExponent,MIN_PIPE_EXPONENT,MAX_PIPE_EXPONENT); range(trunkThickness,MIN_THICKNESS,MAX_THICKNESS);
         range(crownStretch,MIN_STRETCH,MAX_STRETCH); range(crownLayers,MIN_LAYERS,MAX_LAYERS);
         range(crownBase,MIN_CROWN_BASE,MAX_CROWN_BASE);
     }
@@ -108,8 +110,8 @@ public record TreeConfig(TreePreset preset, TreeScale scale, long seed,
     }
     public String logBlock() { return blockPalette.mainTrunk(); }
     public String leavesBlock() { return blockPalette.primaryLeaf(); }
-    public TreeConfig withCanopy(CanopyShape shape,double scale,double density) {
-        return new TreeConfig(preset,this.scale,seed,crookedness,spread,fullness,shape,scale,density,pipeExponent,blockPalette,height,trunkThickness,crownStretch,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence,crownBase);
+    public TreeConfig withCanopy(CanopyShape shape,double canopyScale,double density) {
+        return new TreeConfig(preset,scale,seed,crookedness,spread,fullness,shape,canopyScale,density,pipeExponent,blockPalette,height,trunkThickness,crownStretch,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence,crownBase);
     }
     public TreeConfig withPipeExponent(double exponent) {
         return new TreeConfig(preset,scale,seed,crookedness,spread,fullness,canopyShape,canopyScale,attractionDensity,exponent,blockPalette,height,trunkThickness,crownStretch,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence,crownBase);

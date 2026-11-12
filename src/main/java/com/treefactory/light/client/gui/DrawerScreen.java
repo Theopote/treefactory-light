@@ -6,6 +6,7 @@ import com.treefactory.light.core.config.*;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.*;
+import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -44,7 +45,7 @@ public final class DrawerScreen extends Screen {
     private static Boolean previousHideGui;
     private boolean looking;
     private double mouseX, lookX, lookY;
-    private String presetName = "My tree";
+    private String presetName;
 
     public DrawerScreen() { super(Component.literal("Treefactory Light")); }
 
@@ -52,9 +53,13 @@ public final class DrawerScreen extends Screen {
 
     private int bottom() { return height - BOTTOM_BAR; }
     private int viewport() { return Math.max(0, bottom() - TOP); }
+    private static double normalize(double value,double min,double max) { return (value-min)/(max-min); }
+    private static double interpolate(double value,double min,double max) { return min+(max-min)*value; }
 
     @Override
     protected void init() {
+        mouseX = minecraft.mouseHandler.xpos() / minecraft.getWindow().getGuiScale();
+        if (presetName == null) presetName = Component.translatable("treefactory.preset.default_name").getString();
         panel = 2 * M + ShapeGrid.CELL * SHAPE_COLS + SCROLLBAR_W;
         content.clear();
         fixed.clear();
@@ -123,8 +128,8 @@ public final class DrawerScreen extends Screen {
         y += 16;
         addContent(new ScaleSlider(M, y - scroll, w, c.height(), h -> state.update(state.config().withHeight(h))));
         y += 18;
-        addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.trunk_thickness", (c.trunkThickness() - .5) / 1.5,
-                v -> state.update(state.config().withTrunkThickness(.5 + 1.5 * v))));
+        addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.trunk_thickness", normalize(c.trunkThickness(),TreeConfig.MIN_THICKNESS,TreeConfig.MAX_THICKNESS),
+                v -> state.update(state.config().withTrunkThickness(interpolate(v,TreeConfig.MIN_THICKNESS,TreeConfig.MAX_THICKNESS)))));
         y += 16;
         addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.crookedness", c.crookedness(),
                 v -> state.update(state.config().withDna(v, state.config().spread(), state.config().fullness()))));
@@ -137,17 +142,16 @@ public final class DrawerScreen extends Screen {
             state.update(now.withCanopy(shape, now.canopyScale(), now.attractionDensity()));
             refresh();
         });
-        shapeGrid.setTooltip(Tooltip.create(Component.translatable("treefactory.choose_shape.tip")));
         addContent(shapeGrid);
         y += shapeGrid.getHeight() + 4;
 
-        addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.canopy_size", (c.canopyScale() - .75) / 1.25,
+        addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.canopy_size", normalize(c.canopyScale(),TreeConfig.MIN_CANOPY_SCALE,TreeConfig.MAX_CANOPY_SCALE),
                 v -> {
                     TreeConfig now = state.config();
-                    state.update(now.withCanopy(now.canopyShape(), .75 + 1.25 * v, now.attractionDensity()));
+                    state.update(now.withCanopy(now.canopyShape(), interpolate(v,TreeConfig.MIN_CANOPY_SCALE,TreeConfig.MAX_CANOPY_SCALE), now.attractionDensity()));
                 }));
         y += 16;
-        addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.crown_offset",
+        addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.crown_base",
                 (c.crownBase() - TreeConfig.MIN_CROWN_BASE) / (TreeConfig.MAX_CROWN_BASE - TreeConfig.MIN_CROWN_BASE),
                 v -> state.update(state.config().withCrownBase(TreeConfig.MIN_CROWN_BASE
                         + (TreeConfig.MAX_CROWN_BASE - TreeConfig.MIN_CROWN_BASE) * v))));
@@ -159,24 +163,24 @@ public final class DrawerScreen extends Screen {
                 v -> state.update(state.config().withDna(state.config().crookedness(), state.config().spread(), v))));
                                 y += 16;
         if (c.canopyShape().stretchable()) {
-            addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.crown_stretch", (c.crownStretch() - .6) / 1.4,
-                    v -> state.update(state.config().withCrownStretch(.6 + 1.4 * v))));
+            addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.crown_stretch", normalize(c.crownStretch(),TreeConfig.MIN_STRETCH,TreeConfig.MAX_STRETCH),
+                        v -> state.update(state.config().withCrownStretch(interpolate(v,TreeConfig.MIN_STRETCH,TreeConfig.MAX_STRETCH)))));
                                 y += 16;
         }
         if (c.canopyShape().layered()) {
-            addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.crown_layers", (c.crownLayers() - 3) / 3.0,
-                    v -> state.update(state.config().withCrownLayers(3 + (int) Math.round(3 * v)))));
+            addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.crown_layers", normalize(c.crownLayers(),TreeConfig.MIN_LAYERS,TreeConfig.MAX_LAYERS),
+                    v -> state.update(state.config().withCrownLayers((int) Math.round(interpolate(v,TreeConfig.MIN_LAYERS,TreeConfig.MAX_LAYERS))))));
                                 y += 16;
         }
 
-        addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.attraction_density", (c.attractionDensity() - .5) / 1.5,
+        addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.attraction_density", normalize(c.attractionDensity(),TreeConfig.MIN_DENSITY,TreeConfig.MAX_DENSITY),
                 v -> {
                     TreeConfig now = state.config();
-                    state.update(now.withCanopy(now.canopyShape(), now.canopyScale(), .5 + 1.5 * v));
+                    state.update(now.withCanopy(now.canopyShape(), now.canopyScale(), interpolate(v,TreeConfig.MIN_DENSITY,TreeConfig.MAX_DENSITY)));
                 }));
         y += 16;
-        addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.pipe_exponent", (c.pipeExponent() - 2.5) / .5,
-                v -> state.update(state.config().withPipeExponent(2.5 + .5 * v))));
+        addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.pipe_exponent", normalize(c.pipeExponent(),TreeConfig.MIN_PIPE_EXPONENT,TreeConfig.MAX_PIPE_EXPONENT),
+                v -> state.update(state.config().withPipeExponent(interpolate(v,TreeConfig.MIN_PIPE_EXPONENT,TreeConfig.MAX_PIPE_EXPONENT)))));
         y += 16;
         addContent(new DNAControlSlider(M, y - scroll, w, "treefactory.gravity_influence", c.gravityInfluence(),
                 v -> state.update(state.config().withGravityInfluence(v))));
@@ -235,14 +239,17 @@ public final class DrawerScreen extends Screen {
         return widget.getY() < bottom() && widget.getY() + widget.getHeight() > TOP;
     }
 
-    private boolean fullyInContentViewport(AbstractWidget widget) {
-        return widget.getY() >= TOP && widget.getY() + widget.getHeight() <= bottom();
-    }
-
     private void syncWidgetInteraction(AbstractWidget widget) {
         widget.visible = inContentViewport(widget);
-        // Shape grid is taller than the viewport; allow clicks on whichever rows are visible.
-        widget.active = widget instanceof ShapeGrid ? widget.visible : fullyInContentViewport(widget);
+        widget.active = widget.visible;
+    }
+
+    @Override
+    public Optional<GuiEventListener> getChildAt(double x, double y) {
+        return children().stream()
+                .filter(child -> !content.contains(child) || (y >= TOP && y < bottom()))
+                .filter(child -> child.isMouseOver(x, y))
+                .findFirst().map(child -> child);
     }
 
     private void syncAllContentWidgets() {
@@ -290,7 +297,7 @@ public final class DrawerScreen extends Screen {
         }
         g.disableScissor();
 
-        if (shapeGrid != null && shapeGrid.hovered() != null) {
+        if (shapeGrid != null && mouseY >= TOP && mouseY < bottom() && shapeGrid.hovered() != null) {
             Component tip = shapeGrid.shapeTooltip(shapeGrid.hovered());
             int tipW = font.width(tip);
             int tx = Math.min(mouseX + 8, panel - tipW - 4);
@@ -310,7 +317,9 @@ public final class DrawerScreen extends Screen {
 
         if (materialsOpen && !library) {
             materials.render(g, font, mouseX, mouseY);
+            g.enableScissor(materialLeft, 0, materialLeft + materialWidth, height);
             for (AbstractWidget widget : materialWidgets) widget.extractRenderState(g, mouseX, mouseY, delta);
+            g.disableScissor();
         }
 
         if (menuPreset != null) {
@@ -325,10 +334,18 @@ public final class DrawerScreen extends Screen {
         int statusRight = width - 10;
         Component info = Component.literal(state.status());
         String clipped = font.plainSubstrByWidth(info.getString(), Math.max(40, statusRight - statusLeft));
-        g.text(font, clipped, statusRight - font.width(clipped), height - 14, 0xFFFFFFFF);
+        int infoX = statusRight - font.width(clipped);
+        if (!clipped.isEmpty()) {
+            g.fill(infoX - 3, height - 16, statusRight + 3, height - 3, 0xC010201B);
+            g.text(font, clipped, infoX, height - 14, 0xFFFFFFFF);
+        }
 
         Component hint = Component.translatable("treefactory.preview_hint");
-        g.text(font, font.plainSubstrByWidth(hint.getString(), width - statusLeft - 20), statusLeft, 6, 0xFFFFFFFF);
+        String hintText=font.plainSubstrByWidth(hint.getString(), Math.max(0, width - statusLeft - 20));
+        if (!hintText.isEmpty()) {
+            g.fill(statusLeft - 3, 4, statusLeft + font.width(hintText) + 3, 17, 0xC010201B);
+            g.text(font, hintText, statusLeft, 6, 0xFFFFFFFF);
+        }
 
     }
 
@@ -418,6 +435,7 @@ public final class DrawerScreen extends Screen {
                 state.delete(chosen);
                 return true;
             }
+            return true;
         }
         if (library && event.button() == InputConstants.MOUSE_BUTTON_RIGHT && event.x() < panel
                 && event.y() >= TOP && event.y() < bottom()) {
@@ -442,6 +460,7 @@ public final class DrawerScreen extends Screen {
                     && materials.click(event.x(), event.y())) return true;
             return true;
         }
+        setFocused(null);
         if (event.button() == InputConstants.MOUSE_BUTTON_RIGHT) {
             state.placeAtCursor(event.x(), event.y());
             return true;

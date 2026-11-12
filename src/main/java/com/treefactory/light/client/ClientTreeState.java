@@ -120,6 +120,7 @@ public final class ClientTreeState {
     public void open() {
         Minecraft mc=Minecraft.getInstance();
         if(mc.gui.screen() instanceof DrawerScreen) return;
+        if(mc.player==null || !mc.player.isCreative() || !holdingWand()) { toast("treefactory.creative_only"); return; }
         target=null; active=false; placeDirty=false;
         BlockPos aimed=origin(mc.hitResult);
         mc.gui.setScreen(new DrawerScreen()); refreshLibrary();
