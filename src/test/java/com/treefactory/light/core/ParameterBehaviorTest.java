@@ -60,8 +60,8 @@ class ParameterBehaviorTest {
         var config=TreeConfig.defaults();
         var skeleton=new SpaceColonizer().generate(config);
         var engine=new PipeModelEngine();
-        var thick=engine.apply(skeleton,config.withTaper(0));
-        var thin=engine.apply(skeleton,config.withTaper(1));
+        var thick=engine.apply(skeleton,config.withTaper(1));
+        var thin=engine.apply(skeleton,config.withTaper(0));
         var middle=engine.apply(skeleton,config.withTaper(.5));
         assertEquals(.5,config.taper());
         assertEquals(engine.apply(skeleton,config),middle);
@@ -74,11 +74,11 @@ class ParameterBehaviorTest {
         assertTrue(thickWood >= thinWood * 1.15, "wood blocks: "+thickWood+" vs "+thinWood);
     }
 
-    @Test void taperPreservesPreviousBranchRadii() {
+    @Test void taperMapsToPipeExponent() {
         var skeleton=List.of(new TreeNode(Vector3.ZERO,-1,0),
                 new TreeNode(Vector3.ZERO,0,0),new TreeNode(Vector3.ZERO,0,0));
         var engine=new PipeModelEngine();
-        double[] taper={0,.5,1};
+        double[] taper={1,.5,0};
         double[] previousRadii={.8735907102332541,.675075263027317,.6524357239367048};
         for (int i=0;i<taper.length;i++) {
             var nodes=engine.apply(skeleton,TreeConfig.defaults().withTaper(taper[i]));

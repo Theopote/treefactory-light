@@ -14,6 +14,8 @@ public record TreeConfig(TreeType treeType, long seed,
     public static final double MIN_CANOPY_SCALE=.75, MAX_CANOPY_SCALE=2.0, MIN_DENSITY=.1, MAX_DENSITY=2.0,
             MIN_TAPER=0, MAX_TAPER=1;
     public static final int MIN_LAYERS=3, MAX_LAYERS=6;
+    /** Crown top sits at 110% of trunk height; the crown bottom is kept at least 10% of the trunk above the ground. */
+    private static final double CROWN_TOP_RATIO=1.1, MIN_CROWN_CLEARANCE_RATIO=.1;
     public static final double DEFAULT_BRANCH_ANGLE_BIAS=.5, DEFAULT_BRANCH_DROOP=0, DEFAULT_APICAL_DOMINANCE=.5,
             DEFAULT_GRAVITY_INFLUENCE=.5;
     public TreeConfig {
@@ -88,11 +90,11 @@ public record TreeConfig(TreeType treeType, long seed,
     private double baseVerticalScale() {
         double requested=trunkHeight*(canopyShape==CanopyShape.SPHERE ? .448 : .38)*canopyScale;
         double span=canopyShape.crownMaxY(crownLayers)-canopyShape.crownMinY(crownLayers);
-        return Math.min(requested,trunkHeight*1.1/span);
+        return Math.min(requested,trunkHeight*(CROWN_TOP_RATIO-MIN_CROWN_CLEARANCE_RATIO)/span);
     }
     public double crownVerticalScale() { return baseVerticalScale()*crownStretch; }
     public double crownBaseHeight() {
-        return trunkHeight*1.1-(canopyShape.crownMaxY(crownLayers)-canopyShape.crownMinY(crownLayers))
+        return trunkHeight*CROWN_TOP_RATIO-(canopyShape.crownMaxY(crownLayers)-canopyShape.crownMinY(crownLayers))
                 *baseVerticalScale()*Math.min(1,crownStretch);
     }
     public double crownCenterHeight() {

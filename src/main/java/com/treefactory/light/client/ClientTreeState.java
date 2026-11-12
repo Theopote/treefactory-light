@@ -205,13 +205,15 @@ public final class ClientTreeState {
         if(player!=null) player.sendOverlayMessage(Component.translatable("treefactory.trunk_height",String.format("%.1f",config.trunkHeight())));
     }
     public void refreshLibrary() {
+        java.util.concurrent.atomic.AtomicInteger skippedPresets=new java.util.concurrent.atomic.AtomicInteger();
         CompletableFuture.supplyAsync(()-> {
-            try { return store.loadAll(warning->TreefactoryLight.LOGGER.warn("Invalid preset: {}",warning)); }
+            try { return store.loadAll(warning->{ skippedPresets.incrementAndGet(); TreefactoryLight.LOGGER.warn("Invalid preset: {}",warning); }); }
             catch(Exception e) { throw new CompletionException(e); }
         }).whenComplete((list,error)->Minecraft.getInstance().execute(()-> {
             if(error==null) {
                 List<PresetStore.Preset> combined=new ArrayList<>(BUILT_IN_PRESETS);
                 combined.addAll(list); presets=List.copyOf(combined);
+                if(skippedPresets.get()>0) status=Component.translatable("treefactory.presets_skipped",skippedPresets.get()).getString();
             }
             else { status=Component.translatable("treefactory.load_failed").getString(); TreefactoryLight.LOGGER.warn("Preset loading failed",error); }
             if(Minecraft.getInstance().gui.screen() instanceof DrawerScreen drawer) drawer.refresh();

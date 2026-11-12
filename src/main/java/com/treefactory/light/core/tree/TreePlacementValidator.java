@@ -15,6 +15,8 @@ public final class TreePlacementValidator {
         }
     }
 
+    private static final double MIN_WOOD_RATIO=.5;
+
     private TreePlacementValidator() {}
 
     /**
@@ -57,6 +59,9 @@ public final class TreePlacementValidator {
             queue.addAll(reachable);
             flood(queue, reachable, placeable, false);
             placeable.keySet().removeIf(cell -> !reachable.contains(cell));
+            long totalWood=blocks.values().stream().filter(Voxelizer.Material::woody).count();
+            long keptWood=placeable.values().stream().filter(Voxelizer.Material::woody).count();
+            if (keptWood < totalWood * MIN_WOOD_RATIO) return Result.fail("treefactory.tree_mostly_blocked");
         }
         return Result.ok(placeable);
     }

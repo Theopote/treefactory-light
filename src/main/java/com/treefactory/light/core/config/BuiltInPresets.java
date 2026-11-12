@@ -18,22 +18,22 @@ public final class BuiltInPresets {
         for (TreeType type : TreeType.values())
             list.add(preset(type.id(), TreeConfig.defaults().withTreeType(type)));
         list.add(preset("birch", tree(TreeType.OAK, 18, 2101L, .2, .45, .7,
-                CanopyShape.OVOID, 1.0, 1.1, .6, palette("birch", "oak", .96, .04, 0), .55, 0, .55)));
+                CanopyShape.OVOID, 1.0, 1.1, .4, palette("birch", "oak", .96, .04, 0), .55, 0, .55)));
         list.add(preset("cherry", tree(TreeType.OAK, 14, 2102L, .55, .8, .85,
                 CanopyShape.OBLATE_ELLIPSOID, 1.35, 1.3, .5, palette("cherry", "flowering_azalea", .88, .1, .02),
                 .78, .08, .32)));
         list.add(preset("acacia", tree(TreeType.OAK, 14, 2103L, .75, .85, .6,
-                CanopyShape.UMBRELLA, 1.4, 1.0, .4, palette("acacia", "oak", .97, .03, 0), .88, .12, .25)));
+                CanopyShape.UMBRELLA, 1.4, 1.0, .6, palette("acacia", "oak", .97, .03, 0), .88, .12, .25)));
         list.add(preset("dark_oak", tree(TreeType.OAK, 22, 2104L, .4, .75, .9,
-                CanopyShape.OBOVATE, 1.4, 1.4, .8, palette("dark_oak", "oak", .97, .03, 0), .45, 0, .42)));
+                CanopyShape.OBOVATE, 1.4, 1.4, .2, palette("dark_oak", "oak", .97, .03, 0), .45, 0, .42)));
         list.add(preset("jungle", tree(TreeType.OAK, 36, 2105L, .3, .7, .85,
-                CanopyShape.SPINDLE_MULTI_LAYER, 1.6, 1.2, .2, palette("jungle", "oak", .94, .04, .02), .52, 0, .38)));
+                CanopyShape.SPINDLE_MULTI_LAYER, 1.6, 1.2, .8, palette("jungle", "oak", .94, .04, .02), .52, 0, .38)));
         list.add(preset("cypress", tree(TreeType.OAK, 20, 2106L, .15, .25, .85,
-                CanopyShape.PROLATE_ELLIPSOID, .9, 1.2, .6, palette("spruce", "oak", .98, .02, 0), .1, .04, .92)));
+                CanopyShape.PROLATE_ELLIPSOID, .9, 1.2, .4, palette("spruce", "oak", .98, .02, 0), .1, .04, .92)));
         list.add(preset("mangrove", tree(TreeType.OAK, 15, 2107L, .65, .8, .8,
-                CanopyShape.HEMISPHERE, 1.3, 1.1, .2, palette("mangrove", "oak", .96, .04, 0), .55, .82, .38)));
+                CanopyShape.HEMISPHERE, 1.3, 1.1, .8, palette("mangrove", "oak", .96, .04, 0), .55, .82, .38)));
         list.add(preset("snag", tree(TreeType.DEAD, 20, 2108L, .8, .7, .5,
-                CanopyShape.HEMISPHERE, 1.0, 1.0, .8, palette("pale_oak", "oak", 1, 0, 0), .4, 0, .7)));
+                CanopyShape.HEMISPHERE, 1.0, 1.0, .2, palette("pale_oak", "oak", 1, 0, 0), .4, 0, .7)));
         return List.copyOf(list);
     }
 

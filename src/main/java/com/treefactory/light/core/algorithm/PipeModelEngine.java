@@ -11,8 +11,10 @@ public final class PipeModelEngine {
      * along every root-to-tip path, so a child is never thicker than its parent.
      */
     private static final double LENGTH_WEIGHT = .25, GAMMA = .8;
+    /** Pipe-model exponent range: a low exponent adds child areas (strong taper), a high one approaches the thickest child. */
+    private static final double MIN_EXPONENT=.6, MAX_EXPONENT=4.9;
     public List<TreeNode> apply(List<TreeNode> skeleton, TreeConfig config) {
-        double exponent=2.75+((2.5+config.taper()*.5)-2.75)*8.6;
+        double exponent=MAX_EXPONENT-config.taper()*(MAX_EXPONENT-MIN_EXPONENT);
         double cap=Math.max(1.0,config.trunkHeight()*.055), t=config.trunkThickness();
         int n=skeleton.size();
         double[] sums=new double[n], raw=new double[n]; int[] h=new int[n];

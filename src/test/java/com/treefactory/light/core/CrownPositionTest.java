@@ -37,7 +37,7 @@ class CrownPositionTest {
                             assertEquals(height*1.1,config.withCrownStretch(1).crownTopHeight(),1e-9);
                             assertEquals(config.crownTopHeight(),config.crownCenterHeight()
                                     +shape.crownMaxY(layers)*config.crownVerticalScale(),1e-9,shape.name());
-                            assertTrue(config.crownBaseHeight()>=-1e-9,shape.name());
+                            assertTrue(config.crownBaseHeight()>=height*.1-1e-9,shape.name());
                         }
     }
 
