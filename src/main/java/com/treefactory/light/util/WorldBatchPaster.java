@@ -38,6 +38,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class WorldBatchPaster {
     private static final int FLAGS = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE; // 2 | 16
     private static final int MAX_BUILDS = 4;
+    private static final int RESTORE_BUDGET = 512;
+    private static final int RESTORE_SESSION_BUDGET = 64;
     private static final int UNDO_LIMIT = 5;
     private static final long THROTTLE_NS = 150_000_000L;
     private static final long PERSIST_THROTTLE_NS = 2_000_000_000L; // batches frequent preview-footprint writes
@@ -58,7 +60,7 @@ public final class WorldBatchPaster {
     private final Map<UUID,AtomicBoolean> pending = new HashMap<>();
     private final Map<UUID,Session> sessions = new HashMap<>();
     private final List<DeferredSession> deferredSessions = new ArrayList<>();
-    private final Set<PendingChunk> pendingChunks = new HashSet<>();
+    private final Set<PendingChunk> pendingChunks = new LinkedHashSet<>();
     private final Set<PendingChunk> failedRestoreChunks = new HashSet<>();
     private final PreviewRevision revisions = new PreviewRevision();
     private final Map<UUID,Request> queued = new HashMap<>();
@@ -73,6 +75,8 @@ public final class WorldBatchPaster {
     private boolean storageUnavailable;
     private boolean dirty;
     private long lastPersistNs;
+    private int restoreCursor;
+    private int restoreBudgetRemaining=RESTORE_BUDGET;
     @FunctionalInterface
     public interface CommitNotifier { void notify(ServerPlayer player, long requestId, boolean success); }
     private CommitNotifier commitNotifier = (player, requestId, success) -> {};
@@ -188,9 +192,12 @@ public final class WorldBatchPaster {
                         Map<BlockPos,BlockState> blocks = new LinkedHashMap<>();
                         validation.placeable().forEach((cell, material) -> blocks.put(origin.offset(cell.x(),cell.y(),cell.z()),
                                 orient(materials.get(material), result.axes().get(cell))));
-                        apply(current, level, blocks);
-                        revisions.markApplied(id, revision);
-                        applied=true;
+                        if (apply(current, level, blocks)) {
+                            revisions.markApplied(id, revision);
+                            applied=true;
+                        } else {
+                            message(current,"treefactory.failed");
+                        }
                     }
                 }
                 startQueued();
@@ -346,6 +353,7 @@ public final class WorldBatchPaster {
         sessions.clear(); deferredSessions.clear(); pendingChunks.clear(); failedRestoreChunks.clear(); commitRequests.clear(); undo.clear(); server=null;
     }
     public void tick() {
+        restoreBudgetRemaining=RESTORE_BUDGET;
         restoreLoadedChunks();
         startQueued();
         if (dirty) persist(false);
@@ -355,16 +363,28 @@ public final class WorldBatchPaster {
             pendingChunks.add(new PendingChunk(level, chunk));
     }
     private void restoreLoadedChunks() {
+        int[] budget={restoreBudgetRemaining};
         for (PendingChunk chunk : new ArrayList<>(pendingChunks)) {
+            if (budget[0] == 0) break;
             pendingChunks.remove(chunk);
-            if (restoreChunk(chunk.level(), chunk.pos())) pendingChunks.add(chunk);
+            if (chunk.level().getChunk(chunk.pos().x(), chunk.pos().z(), ChunkStatus.FULL, false)==null) {
+                failedRestoreChunks.remove(chunk);
+                continue;
+            }
+            if (restoreChunk(chunk.level(), chunk.pos(), budget)) pendingChunks.add(chunk);
             else failedRestoreChunks.remove(chunk);
         }
+        restoreBudgetRemaining=budget[0];
     }
-    private boolean restoreChunk(ServerLevel level, ChunkPos chunk) {
+    private boolean restoreChunk(ServerLevel level, ChunkPos chunk, int[] budget) {
         boolean changed=false;
-        for (Session session : sessions.values()) changed|=restoreChunk(session, level, chunk);
-        for (DeferredSession deferred : deferredSessions) changed|=restoreChunk(deferred.session(), level, chunk);
+        List<Session> all=new ArrayList<>(sessions.values());
+        for (DeferredSession deferred : deferredSessions) all.add(deferred.session());
+        if (!all.isEmpty()) {
+            int start=Math.floorMod(restoreCursor++, all.size());
+            for (int i=0; i<all.size() && budget[0]>0; i++)
+                changed|=restoreChunk(all.get((start+i)%all.size()), level, chunk, budget);
+        }
         changed|=sessions.entrySet().removeIf(e -> e.getValue().closing && e.getValue().placed.isEmpty());
         changed|=deferredSessions.removeIf(deferred -> deferred.session().placed.isEmpty());
         if (changed) dirty=true;
@@ -380,13 +400,14 @@ public final class WorldBatchPaster {
                 return true;
         return false;
     }
-    private boolean restoreChunk(Session session, ServerLevel level, ChunkPos chunk) {
-        if (session.level!=level) return false;
-        boolean changed=false;
-        for (BlockPos pos : new ArrayList<>(session.pendingRestore))
-            if (chunk.x()==SectionPos.blockToSectionCoord(pos.getX()) && chunk.z()==SectionPos.blockToSectionCoord(pos.getZ())
-                    && restore(session, pos)) changed=true;
-        return changed;
+    private boolean restoreChunk(Session session, ServerLevel level, ChunkPos chunk, int[] budget) {
+        if (session.level!=level || budget[0]==0) return false;
+        var result=session.retryPending(Math.min(budget[0], RESTORE_SESSION_BUDGET),
+                pos -> chunk.x()==SectionPos.blockToSectionCoord(pos.getX())
+                        && chunk.z()==SectionPos.blockToSectionCoord(pos.getZ()),
+                pos -> restore(session, pos));
+        budget[0]-=result.attempted();
+        return result.restored()>0;
     }
     private void defer(UUID id, Session session) {
         if (session.placed.isEmpty()) return;
@@ -404,7 +425,7 @@ public final class WorldBatchPaster {
                     return replaceable(level.getBlockState(pos));
                 });
     }
-    private void apply(ServerPlayer player,ServerLevel level,Map<BlockPos,BlockState> blocks) {
+    private boolean apply(ServerPlayer player,ServerLevel level,Map<BlockPos,BlockState> blocks) {
         UUID id=player.getUUID();
         Session session=sessions.get(id);
         if (session!=null && session.level!=level) {
@@ -425,11 +446,25 @@ public final class WorldBatchPaster {
         for (BlockPos pos:new ArrayList<>(session.placed.keySet())) if (!next.containsKey(pos)) restore(session,pos);
         for (var entry:next.entrySet()) {
             BlockPos pos=entry.getKey();
-            session.original.computeIfAbsent(pos,level::getBlockState);
-            if (!level.getBlockState(pos).equals(entry.getValue())) level.setBlock(pos,entry.getValue(),FLAGS);
+            if (inaccessibleReason(level, pos)!=null || !level.mayInteract(player, pos))
+                return abortApply(id, session);
+            if (!session.place(pos,entry.getValue(),WorldBatchPaster::replaceable,level::getBlockState,
+                    (p,state) -> level.setBlock(p,state,FLAGS))) {
+                TreefactoryLight.LOGGER.warn("Could not place preview block at {} in {}",
+                        pos, level.dimension().identifier());
+                return abortApply(id, session);
+            }
         }
         session.replacePlaced(next);
         dirty=true;
+        return true;
+    }
+    private boolean abortApply(UUID id, Session session) {
+        session.closing=true;
+        restoreAll(session);
+        if (session.placed.isEmpty()) sessions.remove(id,session);
+        dirty=true;
+        return false;
     }
     private boolean restore(Session session,BlockPos pos) {
         boolean restored=session.restore(pos, p -> chunkReady(session.level, p), session.level::getBlockState,
