@@ -102,7 +102,7 @@
   "treefactory.failed": "Tree generation failed. See the log",
   "treefactory.no_server": "This server needs a compatible Treefactory Light installation",
   "treefactory.creative_only": "Use the Tree Wand in creative mode",
-  "treefactory.target_too_far": "The placement is more than 128 blocks away",
+  "treefactory.target_too_far": "The placement is more than %s blocks away",
   "treefactory.target_height": "The tree exceeds the build height",
   "treefactory.target_border": "The tree crosses the world border",
   "treefactory.target_unloaded": "The tree crosses an unloaded chunk",

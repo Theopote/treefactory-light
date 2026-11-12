@@ -102,7 +102,7 @@
   "treefactory.failed": "树木生成失败，请查看日志",
   "treefactory.no_server": "服务器未安装兼容的 Treefactory Light",
   "treefactory.creative_only": "请在创造模式下手持树木杖操作",
-  "treefactory.target_too_far": "放置位置距离玩家超过 128 格",
+  "treefactory.target_too_far": "放置位置距离玩家超过 %s 格",
   "treefactory.target_height": "树木超出世界建造高度",
   "treefactory.target_border": "树木超出世界边界",
   "treefactory.target_unloaded": "树木经过未加载的区块",
