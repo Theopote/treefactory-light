@@ -13,22 +13,26 @@ public final class UndoPlanner {
      * @param original blocks before the build
      * @param current returns the live block state at a position, or {@code null} if the chunk is unavailable
      * @param chunkReady whether the chunk at a position is loaded
-     * @return restorations to apply, or {@code null} when an unloaded chunk blocks the undo
+     * @return changed cells to restore, or {@code null} when an unloaded chunk blocks the undo
      */
     public static <P, S> Map<P, S> planRestorations(Map<P, S> placed, Map<P, S> original,
             Function<P, S> current, Predicate<P> chunkReady) {
-        for (P pos : placed.keySet()) {
+        for (var cell : placed.entrySet()) {
+            P pos = cell.getKey();
+            S before = original.get(pos);
+            if (before == null || Objects.equals(before, cell.getValue())) continue;
             if (chunkReady.test(pos)) continue;
-            if (original.containsKey(pos)) return null;
+            return null;
         }
         Map<P, S> result = new LinkedHashMap<>();
         for (var cell : placed.entrySet()) {
             P pos = cell.getKey();
+            S before = original.get(pos);
+            if (before == null || Objects.equals(before, cell.getValue())) continue;
             if (!chunkReady.test(pos)) continue;
             S live = current.apply(pos);
             if (!Objects.equals(live, cell.getValue())) continue;
-            S before = original.get(pos);
-            if (before != null) result.put(pos, before);
+            result.put(pos, before);
         }
         return result;
     }

@@ -25,4 +25,27 @@ class UndoPlannerTest {
         var plan = UndoPlanner.planRestorations(placed, original, placed::get, key -> true);
         assertEquals(original, plan);
     }
+
+    @Test void excludesUnchangedCellsWhileRestoringOtherCells() {
+        Map<String, Integer> placed = Map.of("overlap", 1, "changed", 2);
+        Map<String, Integer> original = Map.of("overlap", 1, "changed", -2);
+        assertEquals(Map.of("changed", -2),
+                UndoPlanner.planRestorations(placed, original, placed::get, key -> true));
+    }
+
+    @Test void unchangedCellsDoNotRequireLoadedChunksOrWorldReads() {
+        Map<String, Integer> placed = Map.of("overlap", 1);
+        var plan = UndoPlanner.planRestorations(placed, placed,
+                key -> { fail("unchanged cells should not be read"); return null; },
+                key -> false);
+        assertEquals(Map.of(), plan);
+    }
+
+    @Test void retrySkipsAlreadyRestoredAndUnchangedCells() {
+        Map<String, Integer> placed = Map.of("overlap", 1, "restored", 2, "failed", 3);
+        Map<String, Integer> original = Map.of("overlap", 1, "restored", -2, "failed", -3);
+        Map<String, Integer> current = Map.of("overlap", 1, "restored", -2, "failed", 3);
+        assertEquals(Map.of("failed", -3),
+                UndoPlanner.planRestorations(placed, original, current::get, key -> true));
+    }
 }
