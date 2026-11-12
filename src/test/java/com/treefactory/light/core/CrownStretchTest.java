@@ -8,17 +8,13 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CrownStretchTest {
-    @Test void stretchAnchorsTheCrownBaseForEveryStretchableShape() {
-        SpaceColonizer colonizer = new SpaceColonizer();
+    @Test void stretchAnchorsTheCrownTopForEveryStretchableShape() {
         for (CanopyShape shape : CanopyShape.values()) {
             if (!shape.stretchable()) continue;
-            TreeConfig base = TreeConfig.defaults().withCanopy(shape, 1.4, 1.2).withSeed(8848123L).withCrownStretch(1.0);
-            TreeConfig stretched = base.withCrownStretch(2.0);
-            double baseMin = minCrownY(colonizer.generate(base), base.trunkHeight());
-            double stretchMin = minCrownY(colonizer.generate(stretched), stretched.trunkHeight());
-            assertEquals(baseMin, stretchMin, 1.5, shape.name());
-            assertTrue(maxCrownY(colonizer.generate(stretched), stretched.trunkHeight()) > maxCrownY(colonizer.generate(base), base.trunkHeight()),
-                    shape.name());
+            TreeConfig base = TreeConfig.defaults().withCanopy(shape, .75, 1.2).withCrownStretch(.6);
+            TreeConfig stretched = base.withCrownStretch(1.0);
+            assertEquals(base.crownTopHeight(),stretched.crownTopHeight(),1e-9,shape.name());
+            assertTrue(stretched.crownBaseHeight()<base.crownBaseHeight(),shape.name());
         }
     }
 
@@ -37,13 +33,4 @@ class CrownStretchTest {
         assertTrue(six.size() > 20);
     }
 
-    private static double minCrownY(List<TreeNode> nodes, double height) {
-        double trunkTop = height * .36;
-        return nodes.stream().mapToDouble(n -> n.position().y()).filter(y -> y > trunkTop + .5).min().orElse(trunkTop);
-    }
-
-    private static double maxCrownY(List<TreeNode> nodes, double height) {
-        double trunkTop = height * .36;
-        return nodes.stream().mapToDouble(n -> n.position().y()).filter(y -> y > trunkTop + .5).max().orElse(trunkTop);
-    }
 }

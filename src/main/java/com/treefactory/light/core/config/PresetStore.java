@@ -14,7 +14,7 @@ public final class PresetStore {
     public PresetStore(Path directory) { this.directory = directory; }
     public Path thumbnail(String id) {
         if (!id.matches("[a-zA-Z0-9_-]+")) throw new IllegalArgumentException("Invalid preset id");
-        return directory.resolve(id + "-v6.png");
+        return directory.resolve(id + "-v7.png");
     }
     public Preset save(String name, String author, TreeConfig config) throws IOException {
         if (name == null || name.isBlank() || name.length()>64) throw new IllegalArgumentException("Name must contain 1–64 characters");
@@ -58,7 +58,7 @@ public final class PresetStore {
     }
     public static String encode(String name, String author, TreeConfig c) {
         JsonObject root = new JsonObject();
-        root.addProperty("name",name); root.addProperty("author",author); root.addProperty("version","1.8");
+        root.addProperty("name",name); root.addProperty("author",author); root.addProperty("version","1.9");
         root.addProperty("tree_type",c.treeType().id()); root.addProperty("trunk_height",c.trunkHeight()); root.addProperty("seed",c.seed());
         JsonObject dna = new JsonObject();
         dna.addProperty("crookedness",c.crookedness()); dna.addProperty("spread",c.spread()); dna.addProperty("fullness",c.fullness());
@@ -67,7 +67,7 @@ public final class PresetStore {
         canopy.addProperty("shape",c.canopyShape().name().toLowerCase(Locale.ROOT));
         canopy.addProperty("scale",c.canopyScale()); canopy.addProperty("density",c.attractionDensity());
         canopy.addProperty("crown_stretch",c.crownStretch()); canopy.addProperty("crown_layers",c.crownLayers());
-        canopy.addProperty("crown_base",c.crownBase()); root.add("canopy",canopy);
+        root.add("canopy",canopy);
         JsonObject structure=new JsonObject();
         structure.addProperty("taper",c.taper()); structure.addProperty("trunk_thickness",c.trunkThickness());
         root.add("structure",structure);
@@ -90,7 +90,7 @@ public final class PresetStore {
         if (json.length()>16384) throw new IllegalArgumentException("Preset too large");
         JsonObject root = JsonParser.parseString(json).getAsJsonObject();
         String version=root.get("version").getAsString();
-        if (!"1.8".equals(version)) throw new IllegalArgumentException("Unsupported preset version");
+        if (!"1.9".equals(version)) throw new IllegalArgumentException("Unsupported preset version");
         String name = root.get("name").getAsString(), author = root.get("author").getAsString();
         if (name.isBlank() || name.length()>64 || author.length()>64) throw new IllegalArgumentException("Invalid preset metadata");
         JsonObject dna = root.getAsJsonObject("dna"), palette = root.getAsJsonObject("palette");
@@ -108,7 +108,7 @@ public final class PresetStore {
                 structure.get("trunk_thickness").getAsDouble(),canopy.get("crown_stretch").getAsDouble(),
                 canopy.get("crown_layers").getAsInt(),morphology.get("branch_angle_bias").getAsDouble(),
                 morphology.get("branch_droop").getAsDouble(),morphology.get("apical_dominance").getAsDouble(),
-                morphology.get("gravity_influence").getAsDouble(),canopy.get("crown_base").getAsDouble());
+                morphology.get("gravity_influence").getAsDouble());
         return new Preset(id,name,author,config);
     }
 }

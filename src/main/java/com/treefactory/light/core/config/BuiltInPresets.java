@@ -48,7 +48,7 @@ public final class BuiltInPresets {
                                    double branchAngleBias, double branchDroop, double apicalDominance) {
         return new TreeConfig(type, seed, crookedness, spread, fullness, shape, canopyScale, density, taper,
                 palette, height, 1.0, 1.0, 3, branchAngleBias, branchDroop, apicalDominance,
-                TreeConfig.DEFAULT_GRAVITY_INFLUENCE,TreeConfig.DEFAULT_CROWN_BASE);
+                TreeConfig.DEFAULT_GRAVITY_INFLUENCE);
     }
 
     private static BlockPalette palette(String wood, String secondaryLeaf, double primary, double secondary, double accent) {

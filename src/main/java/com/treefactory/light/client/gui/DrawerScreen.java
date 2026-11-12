@@ -151,11 +151,6 @@ public final class DrawerScreen extends Screen {
                     state.update(now.withCanopy(now.canopyShape(), interpolate(v,TreeConfig.MIN_CANOPY_SCALE,TreeConfig.MAX_CANOPY_SCALE), now.attractionDensity()));
                 }));
         y += 16;
-        addContent(new ParamSlider(M, y - scroll, w, "treefactory.crown_base",
-                (c.crownBase() - TreeConfig.MIN_CROWN_BASE) / (TreeConfig.MAX_CROWN_BASE - TreeConfig.MIN_CROWN_BASE),
-                v -> state.update(state.config().withCrownBase(TreeConfig.MIN_CROWN_BASE
-                        + (TreeConfig.MAX_CROWN_BASE - TreeConfig.MIN_CROWN_BASE) * v))));
-                                y += 16;
         addContent(new ParamSlider(M, y - scroll, w, "treefactory.spread", c.spread(),
                 v -> state.update(state.config().withParameters(state.config().crookedness(), v, state.config().fullness()))));
                                 y += 16;

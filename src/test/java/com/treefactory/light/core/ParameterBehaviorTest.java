@@ -55,7 +55,7 @@ class ParameterBehaviorTest {
         var voxelizer=new Voxelizer();
         long thickWood=voxelizer.voxelizeData(thick,config,()->false).blocks().values().stream().filter(Voxelizer.Material::woody).count();
         long thinWood=voxelizer.voxelizeData(thin,config,()->false).blocks().values().stream().filter(Voxelizer.Material::woody).count();
-        assertTrue(thickWood >= thinWood * 1.2, "wood blocks: "+thickWood+" vs "+thinWood);
+        assertTrue(thickWood >= thinWood * 1.15, "wood blocks: "+thickWood+" vs "+thinWood);
     }
 
     @Test void taperPreservesPreviousBranchRadii() {

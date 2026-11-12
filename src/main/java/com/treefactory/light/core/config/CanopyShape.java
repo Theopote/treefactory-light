@@ -84,7 +84,7 @@ public enum CanopyShape {
     public boolean stretchable() { return true; }
     public boolean layered() { return this==SPINDLE_MULTI_LAYER; }
     /**
-     * Normalized minimum y of the crown along x=z=0. Used to anchor the crown base when stretching.
+     * Normalized minimum y of the crown along x=z=0.
      * Values are conservative (at or below the true boundary) for axisymmetric shapes.
      */
     public double minY(int layers) {
@@ -101,6 +101,15 @@ public enum CanopyShape {
             case TRUNCATED_CONE -> -.78;
             case OBLATE_ELLIPSOID -> -.58;
             default -> minY(layers);
+        };
+    }
+    /** Maximum height of the unperturbed crown shape, including off-axis edges. */
+    public double crownMaxY(int layers) {
+        return switch (this) {
+            case UMBRELLA -> .5;
+            case TRUNCATED_CONE -> .78;
+            case OBLATE_ELLIPSOID -> .58;
+            default -> maxY(layers);
         };
     }
     /** Normalized maximum y of the crown along x=z=0. */

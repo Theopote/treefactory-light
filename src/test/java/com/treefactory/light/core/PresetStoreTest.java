@@ -20,13 +20,13 @@ class PresetStoreTest {
     }
     @Test void unknownVersionsAndNonFiniteNumbersAreRejected() {
         String json=PresetStore.encode("Oak","Player",TreeConfig.defaults());
-        assertThrows(IllegalArgumentException.class,()->PresetStore.decode("id",json.replace("\"1.8\"","\"2.0\"")));
+        assertThrows(IllegalArgumentException.class,()->PresetStore.decode("id",json.replace("\"1.9\"","\"2.0\"")));
         assertThrows(IllegalArgumentException.class,()->PresetStore.decode("id",json.replace("0.35","1e999")));
     }
     @Test void olderVersionsAndMissingCurrentFieldsAreRejected() {
         String current=PresetStore.encode("Oak","Player",TreeConfig.defaults());
-        for (String version : List.of("1.0","1.1","1.2","1.3","1.4","1.5","1.6","1.7"))
-            assertThrows(IllegalArgumentException.class, () -> PresetStore.decode("id",current.replace("\"1.8\"","\""+version+"\"")));
+        for (String version : List.of("1.0","1.1","1.2","1.3","1.4","1.5","1.6","1.7","1.8"))
+            assertThrows(IllegalArgumentException.class, () -> PresetStore.decode("id",current.replace("\"1.9\"","\""+version+"\"")));
         var root=com.google.gson.JsonParser.parseString(current).getAsJsonObject();
         root.getAsJsonObject("morphology").remove("gravity_influence");
         assertThrows(RuntimeException.class, () -> PresetStore.decode("id",root.toString()));
@@ -35,6 +35,8 @@ class PresetStoreTest {
         var config=TreeConfig.defaults().withTaper(.73);
         String json=PresetStore.encode("Oak","Player",config);
         var structure=com.google.gson.JsonParser.parseString(json).getAsJsonObject().getAsJsonObject("structure");
+        var canopy=com.google.gson.JsonParser.parseString(json).getAsJsonObject().getAsJsonObject("canopy");
+        assertFalse(canopy.has("crown_base"));
         assertEquals(.73,structure.get("taper").getAsDouble());
         assertFalse(structure.has("pipe_exponent"));
         assertEquals(config,PresetStore.decode("id",json).config());
