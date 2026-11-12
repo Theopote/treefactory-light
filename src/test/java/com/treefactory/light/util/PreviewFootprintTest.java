@@ -7,59 +7,6 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class PreviewFootprintTest {
-    @Test void placementTracksSuccessfulWritesAndCanRollbackPartialWork() {
-        var footprint = new PreviewFootprint<String, String>();
-        var world = new HashMap<>(Map.of("a", "air", "b", "air"));
-        assertTrue(footprint.place("a", "log", "air"::equals, world::get,
-                (pos, state) -> { world.put(pos, state); return true; }));
-        assertFalse(footprint.place("b", "leaves", "air"::equals, world::get,
-                (pos, state) -> false));
-        assertEquals(Map.of("a", "log"), footprint.placed);
-        assertEquals(Map.of("a", "air"), footprint.original);
-        assertTrue(footprint.restore("a", pos -> true, world::get,
-                (pos, state) -> { world.put(pos, state); return true; }));
-        assertEquals(Map.of("a", "air", "b", "air"), world);
-    }
-
-    @Test void placementDoesNotOverwriteEditedFootprintOrTrackFailedNewCell() {
-        var footprint = new PreviewFootprint<String, String>();
-        var world = new HashMap<>(Map.of("pos", "stone"));
-        footprint.placed.put("pos", "leaves");
-        footprint.original.put("pos", "air");
-        assertFalse(footprint.place("pos", "log", "air"::equals, world::get,
-                (pos, state) -> { fail("must not overwrite player edits"); return false; }));
-        assertEquals("stone", world.get("pos"));
-        assertTrue(footprint.placed.isEmpty());
-        assertTrue(footprint.original.isEmpty());
-    }
-
-    @Test void failedOverlapPreservesOldStateForRollback() {
-        var footprint = new PreviewFootprint<String, String>();
-        var world = new HashMap<>(Map.of("pos", "leaves"));
-        footprint.placed.put("pos", "leaves");
-        footprint.original.put("pos", "air");
-        assertFalse(footprint.place("pos", "log", "air"::equals, world::get, (pos, state) -> false));
-        assertEquals(Map.of("pos", "leaves"), footprint.placed);
-        assertEquals(Map.of("pos", "air"), footprint.original);
-    }
-
-    @Test void placementChecksWorldEvenWhenWriteReportsSuccess() {
-        var footprint = new PreviewFootprint<String, String>();
-        var world = Map.of("pos", "air");
-        assertFalse(footprint.place("pos", "log", "air"::equals, world::get, (pos, state) -> true));
-        assertTrue(footprint.placed.isEmpty());
-        assertTrue(footprint.original.isEmpty());
-    }
-
-    @Test void placementAcceptsDesiredStateEvenWhenWriteReportsFalse() {
-        var footprint = new PreviewFootprint<String, String>();
-        var world = new HashMap<>(Map.of("pos", "air"));
-        assertTrue(footprint.place("pos", "log", "air"::equals, world::get,
-                (pos, state) -> { world.put(pos, state); return false; }));
-        assertEquals(Map.of("pos", "log"), footprint.placed);
-        assertEquals(Map.of("pos", "air"), footprint.original);
-    }
-
     @Test void unloadedOldPreviewIsRestoredAfterMovingAndCommitting() {
         var footprint = new PreviewFootprint<String, String>();
         var world = new HashMap<>(Map.of("old", "leaves", "new", "log"));
@@ -68,7 +15,7 @@ class PreviewFootprintTest {
 
         assertFalse(footprint.restore("old", pos -> false, world::get, (pos, state) -> { world.put(pos, state); return true; }));
         footprint.original.put("new", "grass");
-        footprint.replacePlaced(Map.of("new", "log"));
+        footprint.placed.put("new", "log");
         var committed = footprint.takeCommitted();
         assertEquals(Map.of("new", "log"), committed.placed());
 
@@ -85,27 +32,12 @@ class PreviewFootprintTest {
         footprint.placed.put("old", "leaves");
         footprint.original.put("old", "air");
         assertFalse(footprint.restore("old", pos -> false, world::get, (pos, state) -> { world.put(pos, state); return true; }));
-        footprint.replacePlaced(Map.of());
         world.put("old", "stone");
 
         assertTrue(footprint.restore("old", pos -> true, world::get, (pos, state) -> { world.put(pos, state); return true; }));
         assertEquals("stone", world.get("old"));
         assertTrue(footprint.pendingRestore.isEmpty());
         assertTrue(footprint.placed.isEmpty());
-    }
-
-    @Test void movingPreviewRetainsDeferredFootprintAndOriginal() {
-        var footprint = new PreviewFootprint<String, String>();
-        footprint.placed.put("old", "leaves");
-        footprint.original.put("old", "air");
-        footprint.pendingRestore.add("old");
-        footprint.original.put("new", "grass");
-
-        footprint.replacePlaced(Map.of("new", "log"));
-
-        assertEquals(Map.of("old", "leaves", "new", "log"), footprint.placed);
-        assertEquals(Map.of("old", "air", "new", "grass"), footprint.original);
-        assertEquals(Set.of("old"), footprint.pendingRestore);
     }
 
     @Test void committingKeepsDeferredCellsOutOfUndoHistory() {
@@ -121,21 +53,6 @@ class PreviewFootprintTest {
         assertEquals(Map.of("old", "leaves"), footprint.placed);
         assertEquals(Map.of("old", "air"), footprint.original);
         assertEquals(Set.of("old"), footprint.pendingRestore);
-    }
-
-    @Test void reusingDeferredPositionCancelsItsPendingRestore() {
-        var footprint = new PreviewFootprint<String, String>();
-        footprint.placed.put("overlap", "leaves");
-        footprint.original.put("overlap", "air");
-        footprint.pendingRestore.add("overlap");
-
-        footprint.replacePlaced(Map.of("overlap", "log"));
-        var committed = footprint.takeCommitted();
-
-        assertEquals(Map.of("overlap", "log"), committed.placed());
-        assertEquals(Map.of("overlap", "air"), committed.original());
-        assertTrue(footprint.placed.isEmpty());
-        assertTrue(footprint.pendingRestore.isEmpty());
     }
 
     @Test void failedWriteRetainsFootprintUntilRetrySucceeds() {

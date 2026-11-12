@@ -60,37 +60,6 @@ class CrownPositionTest {
         assertEquals(config, PresetStore.decode("id", PresetStore.encode("Tree", "Player", config)).config());
     }
 
-    @Test void legacyPresetConvertsOriginalCrownPosition() {
-        var root = PresetStoreTest.legacyRoot(PresetStore.encode("Tree", "Player",
-                TreeConfig.defaults().withCrownBase(.2)));
-        root.addProperty("version", "1.3");
-        root.getAsJsonObject("canopy").remove("crown_offset");
-        TreeConfig decoded = PresetStore.decode("id", root.toString()).config();
-        assertEquals(.76 - .38 * 1.25, decoded.crownBase(), 1e-9);
-    }
-
-    @Test void legacyOffsetsAreConvertedAndClampedForDifferentShapes() {
-        for (CanopyShape shape : CanopyShape.values()) {
-            TreeConfig config = TreeConfig.defaults().withTrunkHeight(24).withCanopy(shape, 1.25, 1.25).withCrownStretch(1.4);
-            for (double offset : new double[] {-.2, 0, .2}) {
-                var root = PresetStoreTest.legacyRoot(PresetStore.encode("Tree", "Player", config));
-                root.addProperty("version", "1.4");
-                var canopy = root.getAsJsonObject("canopy");
-                canopy.remove("crown_base");
-                canopy.addProperty("crown_offset", offset);
-                double height = config.trunkHeight(), vertical = shape == CanopyShape.SPHERE
-                        ? height*(.22+.38*config.spread())*config.canopyScale()
-                        : config.crownVerticalScale();
-                double oldCenter = shape == CanopyShape.SPHERE ? Math.max(.76 * height, vertical + 2)
-                        : .76 * height - shape.minY(config.crownLayers()) * height * .38
-                        * config.canopyScale() * (config.crownStretch() - 1);
-                oldCenter += Math.max(1, height * (.36 + offset)) - height * .36;
-                double expected = Math.clamp((oldCenter + shape.crownMinY(config.crownLayers()) * vertical) / height, .1, .7);
-                assertEquals(expected, PresetStore.decode("legacy", root.toString()).config().crownBase(), 1e-9, shape.name());
-            }
-        }
-    }
-
     @Test void trunkReachesConfiguredHeightAndBranchesStartAtCrownBase() {
         SpaceColonizer colonizer = new SpaceColonizer();
         for (double height : new double[] {6, 16.4, 48}) for (double base : new double[] {.1, .3, .7}) {
@@ -108,15 +77,6 @@ class CrownPositionTest {
                 }
             }
             assertTrue(attached>0);
-        }
-    }
-
-    @Test void versionOnePointFivePresetsAreClampedToNewRange() {
-        for (double base : new double[] {0, .05, .2, .5}) {
-            var root = PresetStoreTest.legacyRoot(PresetStore.encode("Tree", "Player", TreeConfig.defaults()));
-            root.addProperty("version", "1.5");
-            root.getAsJsonObject("canopy").addProperty("crown_base", base);
-            assertEquals(Math.max(.1,base),PresetStore.decode("old",root.toString()).config().crownBase());
         }
     }
 

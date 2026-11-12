@@ -68,7 +68,9 @@ class TreeAlgorithmsTest {
         assertThrows(CancellationException.class,()->new TreeBuildTask().build(TreeConfig.defaults(),()->true));
         assertThrows(IllegalArgumentException.class,()->TreeConfig.defaults().withParameters(Double.NaN,.5,.5));
         assertThrows(IllegalArgumentException.class,()->TreeConfig.defaults().withParameters(.5,1.1,.5));
-        assertThrows(IllegalArgumentException.class,()->TreeConfig.defaults().withPalette("../bad","minecraft:oak_leaves"));
+        var palette=TreeConfig.defaults().blockPalette();
+        assertThrows(IllegalArgumentException.class,()->palette.withBlocks("../bad",palette.thickBranch(),palette.thinBranch(),
+                palette.primaryLeaf(),palette.secondaryLeaf(),palette.accentBlock()));
     }
     @Test void extremeDnaAndNegativeSeedsRemainBounded() {
         for(TreeType preset:TreeType.values()) for(int bits=0;bits<8;bits++) {

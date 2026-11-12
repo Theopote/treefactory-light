@@ -213,4 +213,24 @@ class JournaledPlacementTest {
         assertEquals(128,h.tick(128).consumed());
         assertEquals(128,h.writes);
     }
+
+    @Test void placementChecksWorldInsteadOfTrustingWriteReturnValue() {
+        var h=new Harness(1);
+        h.tick(1);
+        h.journals.getFirst().complete(null);
+        var failed=h.placement.tick(1,1,pos -> true,h.world::get,"air"::equals,
+                (pos,state) -> true,() -> CompletableFuture.completedFuture(null));
+        assertEquals(JournaledPlacement.Status.FAILED,failed.status());
+        h.rollback();
+        assertTrue(h.footprint.placed.isEmpty());
+
+        var successful=new Harness(1);
+        successful.tick(1);
+        successful.journals.getFirst().complete(null);
+        var written=successful.placement.tick(1,1,pos -> true,successful.world::get,"air"::equals,
+                (pos,state) -> { successful.world.put(pos,state); return false; },
+                () -> CompletableFuture.completedFuture(null));
+        assertEquals(JournaledPlacement.Status.PROGRESS,written.status());
+        assertEquals("log",successful.world.get(0));
+    }
 }

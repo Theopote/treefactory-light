@@ -19,30 +19,6 @@ class PreviewFootprint<P, S> {
     record Committed<P, S>(Map<P, S> placed, Map<P, S> original) {}
     record RetryResult(int attempted, int restored) {}
 
-    boolean place(P pos, S next, Predicate<S> replaceable, Function<P, S> current, BiPredicate<P, S> set) {
-        S before = current.apply(pos);
-        S previous = placed.get(pos);
-        if (previous != null && !Objects.equals(previous, before)) {
-            placed.remove(pos);
-            original.remove(pos);
-            pendingRestore.remove(pos);
-            previous = null;
-        }
-        if (previous == null && !replaceable.test(before)) return false;
-        boolean newlyTracked = previous == null;
-        if (newlyTracked) original.put(pos, before);
-        if (!Objects.equals(before, next)) {
-            set.test(pos, next);
-            if (!Objects.equals(current.apply(pos), next)) {
-                if (newlyTracked) original.remove(pos);
-                return false;
-            }
-        }
-        placed.put(pos, next);
-        pendingRestore.remove(pos);
-        return true;
-    }
-
     RetryResult retryPending(int limit, Predicate<P> selected, Predicate<P> restore) {
         if (limit <= 0) return new RetryResult(0, 0);
         List<P> batch = new ArrayList<>();
@@ -75,12 +51,6 @@ class PreviewFootprint<P, S> {
         original.remove(pos);
         pendingRestore.remove(pos);
         return true;
-    }
-
-    void replacePlaced(Map<P, S> next) {
-        placed.keySet().removeIf(pos -> !pendingRestore.contains(pos));
-        placed.putAll(next);
-        pendingRestore.removeAll(next.keySet());
     }
 
     Committed<P, S> takeCommitted() {

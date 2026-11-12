@@ -22,10 +22,6 @@ public record BlockPalette(String mainTrunk, String thickBranch, String thinBran
         return new BlockPalette(log, log, log, "minecraft:"+wood+"_leaves",
                 "minecraft:flowering_azalea_leaves", "minecraft:moss_block", .96, .02, .02);
     }
-    public BlockPalette withMainAndPrimary(String trunk, String leaf) {
-        return new BlockPalette(trunk,thickBranch,thinBranch,leaf,secondaryLeaf,accentBlock,
-                primaryWeight,secondaryWeight,accentWeight);
-    }
     public BlockPalette withBlocks(String main,String thick,String thin,String primary,String secondary,String accent) {
         return new BlockPalette(main,thick,thin,primary,secondary,accent,primaryWeight,secondaryWeight,accentWeight);
     }

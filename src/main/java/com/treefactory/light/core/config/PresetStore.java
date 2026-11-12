@@ -90,68 +90,25 @@ public final class PresetStore {
         if (json.length()>16384) throw new IllegalArgumentException("Preset too large");
         JsonObject root = JsonParser.parseString(json).getAsJsonObject();
         String version=root.get("version").getAsString();
-        if (!Set.of("1.0","1.1","1.2","1.3","1.4","1.5","1.6","1.7").contains(version)) throw new IllegalArgumentException("Unsupported preset version");
+        if (!"1.7".equals(version)) throw new IllegalArgumentException("Unsupported preset version");
         String name = root.get("name").getAsString(), author = root.get("author").getAsString();
         if (name.isBlank() || name.length()>64 || author.length()>64) throw new IllegalArgumentException("Invalid preset metadata");
         JsonObject dna = root.getAsJsonObject("dna"), palette = root.getAsJsonObject("palette");
-        boolean current="1.7".equals(version);
-        TreeType type=TreeType.valueOf(root.get(current?"tree_type":"preset_type").getAsString().toUpperCase(Locale.ROOT));
-        TreeConfig legacy = new TreeConfig(type,
-                current ? TreeScale.MEDIUM : TreeScale.valueOf(root.get("scale").getAsString().toUpperCase(Locale.ROOT)),root.get("seed").getAsLong(),
-                dna.get("crookedness").getAsDouble(),dna.get("spread").getAsDouble(),dna.get("fullness").getAsDouble(),
-                palette.get("log_block").getAsString(),palette.get("leaves_block").getAsString());
-        if("1.0".equals(version)) return new Preset(id,name,author,legacy.withCrownBase(legacyCrownBase(legacy,0)));
+        TreeType type=TreeType.valueOf(root.get("tree_type").getAsString().toUpperCase(Locale.ROOT));
         JsonObject canopy=root.getAsJsonObject("canopy");
-        BlockPalette blocks=new BlockPalette(legacy.logBlock(),palette.get("thick_branch").getAsString(),
-                palette.get("thin_branch").getAsString(),legacy.leavesBlock(),palette.get("secondary_leaf").getAsString(),
+        BlockPalette blocks=new BlockPalette(palette.get("log_block").getAsString(),palette.get("thick_branch").getAsString(),
+                palette.get("thin_branch").getAsString(),palette.get("leaves_block").getAsString(),palette.get("secondary_leaf").getAsString(),
                 palette.get("accent_block").getAsString(),palette.get("primary_weight").getAsDouble(),
                 palette.get("secondary_weight").getAsDouble(),palette.get("accent_weight").getAsDouble());
-        double height=current ? root.get("trunk_height").getAsDouble() : root.has("height")?root.get("height").getAsDouble():legacy.trunkHeight();
-        JsonObject structure=current ? root.getAsJsonObject("structure") : canopy;
-        JsonObject morphology=root.has("morphology")?root.getAsJsonObject("morphology"):null;
-        double angleBias=morphology!=null && morphology.has("branch_angle_bias")?morphology.get("branch_angle_bias").getAsDouble():TreeConfig.DEFAULT_BRANCH_ANGLE_BIAS;
-        double droop=morphology!=null && morphology.has("branch_droop")?morphology.get("branch_droop").getAsDouble():TreeConfig.DEFAULT_BRANCH_DROOP;
-        double apical=morphology!=null && morphology.has("apical_dominance")?morphology.get("apical_dominance").getAsDouble():TreeConfig.DEFAULT_APICAL_DOMINANCE;
-        double gravity=morphology!=null && morphology.has("gravity_influence")?morphology.get("gravity_influence").getAsDouble():TreeConfig.DEFAULT_GRAVITY_INFLUENCE;
-        if ("1.2".equals(version) && morphology!=null && morphology.has("gravity_influence")) {
-            if (!Double.isFinite(gravity) || gravity < 0 || gravity > 1) throw new IllegalArgumentException("Invalid gravity influence");
-            // The old slider applied -0.8 * gravity; preserve that bias on the new centered scale.
-            gravity=0.5+gravity/3.0;
-        }
-        TreeConfig config=new TreeConfig(type,legacy.scale(),legacy.seed(),legacy.crookedness(),legacy.spread(),legacy.fullness(),
+        JsonObject structure=root.getAsJsonObject("structure"), morphology=root.getAsJsonObject("morphology");
+        TreeConfig config=new TreeConfig(type,root.get("seed").getAsLong(),dna.get("crookedness").getAsDouble(),
+                dna.get("spread").getAsDouble(),dna.get("fullness").getAsDouble(),
                 CanopyShape.valueOf(canopy.get("shape").getAsString().toUpperCase(Locale.ROOT)),canopy.get("scale").getAsDouble(),
-                canopy.get("density").getAsDouble(),structure.get("pipe_exponent").getAsDouble(),blocks,height,
-                structure.has("trunk_thickness")?structure.get("trunk_thickness").getAsDouble():1.0,
-                canopy.has("crown_stretch")?canopy.get("crown_stretch").getAsDouble():1.0,
-                canopy.has("crown_layers")?canopy.get("crown_layers").getAsInt():3,angleBias,droop,apical,gravity);
-        if ("1.6".equals(version) || current) {
-            config=config.withCrownBase(canopy.get("crown_base").getAsDouble());
-        } else if ("1.5".equals(version)) {
-            double base=canopy.get("crown_base").getAsDouble();
-            if (!Double.isFinite(base) || base<0 || base>.5) throw new IllegalArgumentException("Invalid legacy crown base");
-            config=config.withCrownBase(Math.clamp(base,TreeConfig.MIN_CROWN_BASE,TreeConfig.MAX_CROWN_BASE));
-        } else {
-            double oldOffset=canopy.has("crown_offset")?canopy.get("crown_offset").getAsDouble():0;
-            if (!Double.isFinite(oldOffset) || oldOffset < -.2 || oldOffset > .2)
-                throw new IllegalArgumentException("Invalid legacy crown offset");
-            config=config.withCrownBase(legacyCrownBase(config,oldOffset));
-        }
+                canopy.get("density").getAsDouble(),structure.get("pipe_exponent").getAsDouble(),blocks,root.get("trunk_height").getAsDouble(),
+                structure.get("trunk_thickness").getAsDouble(),canopy.get("crown_stretch").getAsDouble(),
+                canopy.get("crown_layers").getAsInt(),morphology.get("branch_angle_bias").getAsDouble(),
+                morphology.get("branch_droop").getAsDouble(),morphology.get("apical_dominance").getAsDouble(),
+                morphology.get("gravity_influence").getAsDouble(),canopy.get("crown_base").getAsDouble());
         return new Preset(id,name,author,config);
-    }
-    private static double legacyCrownBase(TreeConfig config, double offset) {
-        double height=config.trunkHeight();
-        double vertical=config.canopyShape()==CanopyShape.SPHERE
-                ? height*(.22+.38*config.spread())*config.canopyScale()
-                : height*.38*config.canopyScale()*config.crownStretch();
-        double center;
-        if (config.canopyShape()==CanopyShape.SPHERE) {
-            center=Math.max(height*.76,vertical+2);
-        } else {
-            center=height*.76-config.canopyShape().minY(config.crownLayers())*height*.38
-                    *config.canopyScale()*(config.crownStretch()-1);
-        }
-        center+=Math.max(1,height*(.36+offset))-height*.36;
-        double base=(center+config.canopyShape().crownMinY(config.crownLayers())*vertical)/height;
-        return Math.clamp(base,TreeConfig.MIN_CROWN_BASE,TreeConfig.MAX_CROWN_BASE);
     }
 }
