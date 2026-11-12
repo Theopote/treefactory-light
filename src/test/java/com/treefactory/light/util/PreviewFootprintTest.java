@@ -13,13 +13,13 @@ class PreviewFootprintTest {
         footprint.placed.put("old", "leaves");
         footprint.original.put("old", "air");
 
-        assertFalse(footprint.restore("old", pos -> false, world::get, world::put));
+        assertFalse(footprint.restore("old", pos -> false, world::get, (pos, state) -> { world.put(pos, state); return true; }));
         footprint.original.put("new", "grass");
         footprint.replacePlaced(Map.of("new", "log"));
         var committed = footprint.takeCommitted();
         assertEquals(Map.of("new", "log"), committed.placed());
 
-        assertTrue(footprint.restore("old", pos -> true, world::get, world::put));
+        assertTrue(footprint.restore("old", pos -> true, world::get, (pos, state) -> { world.put(pos, state); return true; }));
         assertEquals(Map.of("old", "air", "new", "log"), world);
         assertTrue(footprint.placed.isEmpty());
         assertTrue(footprint.original.isEmpty());
@@ -31,11 +31,11 @@ class PreviewFootprintTest {
         var world = new HashMap<>(Map.of("old", "leaves"));
         footprint.placed.put("old", "leaves");
         footprint.original.put("old", "air");
-        assertFalse(footprint.restore("old", pos -> false, world::get, world::put));
+        assertFalse(footprint.restore("old", pos -> false, world::get, (pos, state) -> { world.put(pos, state); return true; }));
         footprint.replacePlaced(Map.of());
         world.put("old", "stone");
 
-        assertTrue(footprint.restore("old", pos -> true, world::get, world::put));
+        assertTrue(footprint.restore("old", pos -> true, world::get, (pos, state) -> { world.put(pos, state); return true; }));
         assertEquals("stone", world.get("old"));
         assertTrue(footprint.pendingRestore.isEmpty());
         assertTrue(footprint.placed.isEmpty());
@@ -83,5 +83,50 @@ class PreviewFootprintTest {
         assertEquals(Map.of("overlap", "air"), committed.original());
         assertTrue(footprint.placed.isEmpty());
         assertTrue(footprint.pendingRestore.isEmpty());
+    }
+
+    @Test void failedWriteRetainsFootprintUntilRetrySucceeds() {
+        var footprint = new PreviewFootprint<String, String>();
+        var world = new HashMap<>(Map.of("pos", "log"));
+        footprint.placed.put("pos", "log");
+        footprint.original.put("pos", "air");
+
+        assertFalse(footprint.restore("pos", pos -> true, world::get, (pos, state) -> false));
+        assertEquals(Map.of("pos", "log"), footprint.placed);
+        assertEquals(Map.of("pos", "air"), footprint.original);
+        assertEquals(Set.of("pos"), footprint.pendingRestore);
+
+        assertTrue(footprint.restore("pos", pos -> true, world::get, (pos, state) -> {
+            world.put(pos, state);
+            return true;
+        }));
+        assertEquals("air", world.get("pos"));
+        assertTrue(footprint.placed.isEmpty());
+        assertTrue(footprint.original.isEmpty());
+        assertTrue(footprint.pendingRestore.isEmpty());
+    }
+
+    @Test void failedWriteFollowedByPlayerEditDoesNotOverwriteEdit() {
+        var footprint = new PreviewFootprint<String, String>();
+        var world = new HashMap<>(Map.of("pos", "log"));
+        footprint.placed.put("pos", "log");
+        footprint.original.put("pos", "air");
+        assertFalse(footprint.restore("pos", pos -> true, world::get, (pos, state) -> false));
+        world.put("pos", "stone");
+
+        assertTrue(footprint.restore("pos", pos -> true, world::get,
+                (pos, state) -> { fail("must not overwrite player edits"); return false; }));
+        assertEquals("stone", world.get("pos"));
+        assertTrue(footprint.placed.isEmpty());
+    }
+
+    @Test void unchangedOriginalDoesNotRequireWrite() {
+        var footprint = new PreviewFootprint<String, String>();
+        footprint.placed.put("pos", "leaves");
+        footprint.original.put("pos", "leaves");
+
+        assertTrue(footprint.restore("pos", pos -> true, pos -> "leaves",
+                (pos, state) -> { fail("unchanged blocks should not be written"); return false; }));
+        assertTrue(footprint.placed.isEmpty());
     }
 }

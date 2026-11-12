@@ -156,8 +156,8 @@ public final class Voxelizer {
         if(sample<palette.primaryWeight()+palette.secondaryWeight()) return Material.SECONDARY_LEAF;
         return Material.ACCENT;
     }
-    static void connectSpineForTest(VoxelAccumulator acc,Vector3 a,Vector3 b,Material wood,Axis axis) {
-        connectSpine(acc,a,b,wood,axis);
+    static void connectSpineForTest(VoxelAccumulator acc, Vector3 a, Vector3 b, Axis axis) {
+        connectSpine(acc,a,b, Material.MAIN_TRUNK,axis);
     }
     private static void connectSpine(VoxelAccumulator acc,Vector3 a,Vector3 b,Material wood,Axis axis) {
         int x=(int)Math.floor(a.x()),y=(int)Math.floor(a.y()),z=(int)Math.floor(a.z());

@@ -19,7 +19,7 @@ class VoxelizerBudgetTest {
         Vector3 a = new Vector3(.5, 50.5, .5);
         Vector3 b = new Vector3(4.5, 50.5, .5);
         assertThrows(IllegalArgumentException.class,
-                () -> Voxelizer.connectSpineForTest(acc, a, b, Voxelizer.Material.MAIN_TRUNK, Voxelizer.Axis.X));
+                () -> Voxelizer.connectSpineForTest(acc, a, b, Voxelizer.Axis.X));
     }
 
     @Test void extremeThicknessAndDensityStayWithinBudget() {

@@ -59,6 +59,7 @@ public final class WorldBatchPaster {
     private final Map<UUID,Session> sessions = new HashMap<>();
     private final List<DeferredSession> deferredSessions = new ArrayList<>();
     private final Set<PendingChunk> pendingChunks = new HashSet<>();
+    private final Set<PendingChunk> failedRestoreChunks = new HashSet<>();
     private final PreviewRevision revisions = new PreviewRevision();
     private final Map<UUID,Request> queued = new HashMap<>();
     private final Map<UUID,Long> lastPreview = new HashMap<>();
@@ -342,7 +343,7 @@ public final class WorldBatchPaster {
             try { finalWrite.get(10, TimeUnit.SECONDS); }
             catch (Exception e) { TreefactoryLight.LOGGER.warn("Timed out saving preview state on shutdown", e); }
         }
-        sessions.clear(); deferredSessions.clear(); pendingChunks.clear(); commitRequests.clear(); undo.clear(); server=null;
+        sessions.clear(); deferredSessions.clear(); pendingChunks.clear(); failedRestoreChunks.clear(); commitRequests.clear(); undo.clear(); server=null;
     }
     public void tick() {
         restoreLoadedChunks();
@@ -357,6 +358,7 @@ public final class WorldBatchPaster {
         for (PendingChunk chunk : new ArrayList<>(pendingChunks)) {
             pendingChunks.remove(chunk);
             if (restoreChunk(chunk.level(), chunk.pos())) pendingChunks.add(chunk);
+            else failedRestoreChunks.remove(chunk);
         }
     }
     private boolean restoreChunk(ServerLevel level, ChunkPos chunk) {
@@ -378,7 +380,7 @@ public final class WorldBatchPaster {
                 return true;
         return false;
     }
-    private static boolean restoreChunk(Session session, ServerLevel level, ChunkPos chunk) {
+    private boolean restoreChunk(Session session, ServerLevel level, ChunkPos chunk) {
         if (session.level!=level) return false;
         boolean changed=false;
         for (BlockPos pos : new ArrayList<>(session.pendingRestore))
@@ -429,11 +431,19 @@ public final class WorldBatchPaster {
         session.replacePlaced(next);
         dirty=true;
     }
-    private static boolean restore(Session session,BlockPos pos) {
-        return session.restore(pos, p -> chunkReady(session.level, p), session.level::getBlockState,
+    private boolean restore(Session session,BlockPos pos) {
+        boolean restored=session.restore(pos, p -> chunkReady(session.level, p), session.level::getBlockState,
                 (p, state) -> session.level.setBlock(p,state,FLAGS));
+        if (!restored && chunkReady(session.level, pos)) {
+            PendingChunk chunk=new PendingChunk(session.level, new ChunkPos(
+                    SectionPos.blockToSectionCoord(pos.getX()), SectionPos.blockToSectionCoord(pos.getZ())));
+            pendingChunks.add(chunk);
+            if (failedRestoreChunks.add(chunk)) TreefactoryLight.LOGGER.warn("Could not restore preview block at {} in {}; will retry",
+                    pos, session.level.dimension().identifier());
+        }
+        return restored;
     }
-    private static void restoreAll(Session session) {
+    private void restoreAll(Session session) {
         for (BlockPos pos:new ArrayList<>(session.placed.keySet())) restore(session,pos);
     }
     private static String inaccessibleReason(ServerLevel level,BlockPos pos) {
