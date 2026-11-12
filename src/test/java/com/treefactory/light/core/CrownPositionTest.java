@@ -54,7 +54,7 @@ class CrownPositionTest {
         TreeConfig updated = config.withSeed(1).withTrunkHeight(32).withScale(TreeScale.LARGE)
                 .withParameters(.2, .4, .6).withCanopy(CanopyShape.SPHERE, 1.1, 1)
                 .withTrunkThickness(1.2).withCrownStretch(1.3).withCrownLayers(4)
-                .withPipeExponent(2.6).withGravityInfluence(.8)
+                .withTaper(.2).withGravityInfluence(.8)
                 .withMorphology(.1, .2, .3).withBlockPalette(config.blockPalette()).withTreeType(TreeType.PINE);
         assertEquals(.15, updated.crownBase());
         assertEquals(config, PresetStore.decode("id", PresetStore.encode("Tree", "Player", config)).config());

@@ -22,7 +22,7 @@ class TranslationKeysTest {
             assertTrue(english.has("treefactory.builtin."+preset.id().substring(BuiltInPresets.PREFIX.length())),preset.id());
         for (String key : Set.of("generator","library","finish_tree","choose_materials","new_seed","save_preset",
                 "trunk_thickness","crookedness","canopy_size","crown_base","spread","fullness","crown_stretch",
-                "crown_layers","attraction_density","pipe_exponent","gravity_influence","secondary_weight","accent_weight"))
+                "crown_layers","attraction_density","taper","gravity_influence","secondary_weight","accent_weight"))
             assertTrue(english.has("treefactory."+key+".tip"),key);
     }
 

@@ -18,7 +18,6 @@ public final class ParamSlider extends AbstractSliderButton {
         Object shown=switch(key) {
             case "treefactory.canopy_size" -> String.format(Locale.ROOT,"%.2f",interpolate(TreeConfig.MIN_CANOPY_SCALE,TreeConfig.MAX_CANOPY_SCALE));
             case "treefactory.attraction_density" -> String.format(Locale.ROOT,"%.2f",interpolate(TreeConfig.MIN_DENSITY,TreeConfig.MAX_DENSITY));
-            case "treefactory.pipe_exponent" -> String.format(Locale.ROOT,"%.2f",interpolate(TreeConfig.MIN_PIPE_EXPONENT,TreeConfig.MAX_PIPE_EXPONENT));
             case "treefactory.trunk_thickness" -> String.format(Locale.ROOT,"%.2f",interpolate(TreeConfig.MIN_THICKNESS,TreeConfig.MAX_THICKNESS));
             case "treefactory.crown_stretch" -> String.format(Locale.ROOT,"%.2f",interpolate(TreeConfig.MIN_STRETCH,TreeConfig.MAX_STRETCH));
             case "treefactory.crown_base" -> (int)Math.round((TreeConfig.MIN_CROWN_BASE

@@ -26,7 +26,7 @@ class PreviewPacketTest {
     @Test void roundTripsTreeTypeAndContinuousHeight() {
         var buffer=new RegistryFriendlyByteBuf(Unpooled.buffer(),RegistryAccess.EMPTY);
         try {
-            var config=TreeConfig.defaults().withTreeType(TreeType.PINE).withTrunkHeight(10.3);
+            var config=TreeConfig.defaults().withTreeType(TreeType.PINE).withTrunkHeight(10.3).withTaper(.73);
             var packet=new C2SPreviewTreePacket(new BlockPos(12,75,-3),config);
             C2SPreviewTreePacket.CODEC.encode(buffer,packet);
             assertEquals(packet,C2SPreviewTreePacket.CODEC.decode(buffer));

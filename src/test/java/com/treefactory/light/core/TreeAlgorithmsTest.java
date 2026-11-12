@@ -130,7 +130,8 @@ class TreeAlgorithmsTest {
         double primary=a.values().stream().filter(m->m==Voxelizer.Material.PRIMARY_LEAF).count()/(double)leafCount;
         double secondary=a.values().stream().filter(m->m==Voxelizer.Material.SECONDARY_LEAF).count()/(double)leafCount;
         assertEquals(.8,primary,.1); assertEquals(.15,secondary,.08);
-        assertThrows(IllegalArgumentException.class,()->config.withPipeExponent(2.2));
+        assertThrows(IllegalArgumentException.class,()->config.withTaper(-.01));
+        assertThrows(IllegalArgumentException.class,()->config.withTaper(1.01));
         assertThrows(IllegalArgumentException.class,()->config.withCanopy(CanopyShape.SPHERE,2.5,1));
     }
     @Test void largestSupportedCanopyStaysWithinBudget() {

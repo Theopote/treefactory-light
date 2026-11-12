@@ -18,13 +18,19 @@ final class JournaledPlacement<P, S> {
     record Result(Status status, int consumed, Throwable error) {}
 
     private final PreviewFootprint<P, S> footprint;
+    private final PreviewFootprint<P, S> previous;
     private final Iterator<Map.Entry<P, S>> remaining;
     private final Map<P, S> before = new LinkedHashMap<>();
     private CompletableFuture<Void> journal;
     private Iterator<Map.Entry<P, S>> verify;
 
     JournaledPlacement(PreviewFootprint<P, S> footprint, Map<P, S> blocks) {
+        this(footprint, null, blocks);
+    }
+
+    JournaledPlacement(PreviewFootprint<P, S> footprint, PreviewFootprint<P, S> previous, Map<P, S> blocks) {
         this.footprint = footprint;
+        this.previous = previous;
         this.remaining = blocks.entrySet().iterator();
     }
 
@@ -61,6 +67,11 @@ final class JournaledPlacement<P, S> {
                     write.test(pos, target);
                     if (!Objects.equals(current.apply(pos), target)) return result(Status.FAILED, count);
                 }
+                if (previous != null) {
+                    previous.placed.remove(pos);
+                    previous.original.remove(pos);
+                    previous.pendingRestore.remove(pos);
+                }
                 prepared.remove();
             }
             journal = null;
@@ -74,10 +85,26 @@ final class JournaledPlacement<P, S> {
             count++;
             if (!accessible.test(pos)) return result(Status.FAILED, count);
             S state = current.apply(pos);
-            if (!replaceable.test(state)) return result(Status.FAILED, count);
+            S old = previous == null ? null : previous.placed.get(pos);
+            if (old != null ? !Objects.equals(old, state) : !replaceable.test(state))
+                return result(Status.FAILED, count);
+            S original = old == null ? state : previous.original.get(pos);
+            if (original == null) return result(Status.FAILED, count);
+            if (old != null && Objects.equals(old, entry.getValue())) {
+                footprint.original.put(pos, original);
+                footprint.placed.put(pos, old);
+                previous.placed.remove(pos);
+                previous.original.remove(pos);
+                previous.pendingRestore.remove(pos);
+                continue;
+            }
             before.put(pos, state);
-            footprint.original.put(pos, state);
+            footprint.original.put(pos, original);
             footprint.placed.put(pos, entry.getValue());
+        }
+        if (before.isEmpty()) {
+            if (!remaining.hasNext()) verify = footprint.placed.entrySet().iterator();
+            return result(Status.PROGRESS, count);
         }
         journal = persist.get();
         return result(journal == null ? Status.STORAGE_FAILED : Status.PROGRESS, count);

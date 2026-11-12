@@ -1,6 +1,8 @@
 package com.treefactory.light.client.gui.render;
 
 import com.treefactory.light.client.PreviewSnapshot;
+import com.treefactory.light.core.tree.Cell;
+import com.treefactory.light.util.ConnectedBlockStates;
 import com.treefactory.light.util.WorldBatchPaster;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
@@ -12,6 +14,8 @@ import net.minecraft.client.renderer.state.gui.pip.PictureInPictureRenderState;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.EmptyBlockGetter;
+import net.minecraft.world.level.block.Blocks;
 import org.joml.Quaternionf;
 import org.jspecify.annotations.NonNull;
 
@@ -38,12 +42,21 @@ public final class TreePictureRenderer extends PictureInPictureRenderer<TreePict
     public static void submitBlocks(PreviewSnapshot snapshot,PoseStack pose,SubmitNodeCollector collector) {
         Minecraft mc=Minecraft.getInstance();
         var palette=WorldBatchPaster.palette(snapshot.config());
+        var tree=snapshot.tree();
+        var view=palette.values().stream().anyMatch(ConnectedBlockStates::supported)
+                ? ConnectedBlockStates.view(EmptyBlockGetter.INSTANCE,pos -> {
+                    var cell=new Cell(pos.getX(),pos.getY(),pos.getZ());
+                    var material=tree.blocks().get(cell);
+                    return material==null ? Blocks.AIR.defaultBlockState()
+                            : WorldBatchPaster.orient(palette.get(material),tree.axes().get(cell));
+                }) : null;
         Map<net.minecraft.world.level.block.state.BlockState,List<BlockStateModelPart>> parts=new HashMap<>();
         Map<net.minecraft.world.level.block.state.BlockState,int[]> tints=new HashMap<>();
         var models=mc.getModelManager().getBlockStateModelSet();
         for(var cell:snapshot.surface()) {
             var material=snapshot.tree().blocks().get(cell);
             var block=WorldBatchPaster.orient(palette.get(material),snapshot.tree().axes().get(cell));
+            if (view!=null) block=ConnectedBlockStates.resolve(view,new net.minecraft.core.BlockPos(cell.x(),cell.y(),cell.z()),block);
             var modelParts=parts.computeIfAbsent(block,state->{
                 List<BlockStateModelPart> value=new ArrayList<>();
                 models.get(state).collectParts(RandomSource.create(snapshot.config().seed()),value);

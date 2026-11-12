@@ -12,15 +12,15 @@ public final class PipeModelEngine {
      */
     private static final double LENGTH_WEIGHT = .25, GAMMA = .8;
     public List<TreeNode> apply(List<TreeNode> skeleton, TreeConfig config) {
-        // Expand the displayed exponent's narrow range to make branch thickness visibly adjustable.
-        double cap=Math.max(1.0,config.trunkHeight()*.055), e=2.75+(config.pipeExponent()-2.75)*8.6, t=config.trunkThickness();
+        double exponent=2.75+((2.5+config.taper()*.5)-2.75)*8.6;
+        double cap=Math.max(1.0,config.trunkHeight()*.055), t=config.trunkThickness();
         int n=skeleton.size();
         double[] sums=new double[n], raw=new double[n]; int[] h=new int[n];
         for (int i=n-1;i>=0;i--) {
             TreeNode node=skeleton.get(i);
             if (node.parent() >= i || node.parent() < -1) throw new IllegalArgumentException("Invalid tree topology");
-            raw[i]= sums[i]==0 ? .5 : StrictMath.pow(sums[i],1/e);
-            if (node.parent()>=0) { sums[node.parent()]+=StrictMath.pow(raw[i],e); h[node.parent()]=Math.max(h[node.parent()],h[i]+1); }
+            raw[i]= sums[i]==0 ? .5 : StrictMath.pow(sums[i],1/exponent);
+            if (node.parent()>=0) { sums[node.parent()]+=StrictMath.pow(raw[i],exponent); h[node.parent()]=Math.max(h[node.parent()],h[i]+1); }
         }
         double span=cap-.5, hRoot=Math.max(1,h[0]);
         double[] fin=new double[n]; List<TreeNode> out=new ArrayList<>(skeleton);
