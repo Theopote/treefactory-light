@@ -336,8 +336,6 @@ public final class DrawerScreen extends Screen {
         var infoLines = font.split(Component.literal(state.status()), Math.max(40, statusRight - statusLeft));
         if (!state.status().isEmpty()) {
             int lineH = font.lineHeight + 1, boxTop = height - 3 - infoLines.size() * lineH - 2;
-            int boxW = infoLines.stream().mapToInt(font::width).max().orElse(0);
-            g.fill(statusRight - boxW - 3, boxTop, statusRight + 3, height - 3, 0xC010201B);
             for (int i = 0; i < infoLines.size(); i++)
                 g.text(font, infoLines.get(i), statusRight - font.width(infoLines.get(i)), boxTop + 2 + i * lineH, 0xFFFFFFFF);
         }
@@ -345,8 +343,6 @@ public final class DrawerScreen extends Screen {
         var hintLines = font.split(Component.translatable("treefactory.preview_hint"), Math.max(40, width - statusLeft - 20));
         if (!hintLines.isEmpty()) {
             int lineH = font.lineHeight + 1;
-            int hintW = hintLines.stream().mapToInt(font::width).max().orElse(0);
-            g.fill(statusLeft - 3, 4, statusLeft + hintW + 3, 8 + hintLines.size() * lineH, 0xC010201B);
             for (int i = 0; i < hintLines.size(); i++) g.text(font, hintLines.get(i), statusLeft, 6 + i * lineH, 0xFFFFFFFF);
         }
 

@@ -38,7 +38,6 @@ public final class PresetCardWidget extends Button {
                 ? Component.translatable("treefactory.builtin."+preset.id().substring("builtin-".length()))
                 : Component.literal(preset.name());
         int avail=Math.max(0,width-8), textW=font.width(label.getString());
-        graphics.fill(getX()+2,getY()+height-13,getX()+width-2,getY()+height-2,0xC010201B);
         int offset=0;
         if(textW>avail) {
             // Ping-pong scroll so the whole name can be read; static while not hovered.
