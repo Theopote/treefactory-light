@@ -10,6 +10,8 @@ import net.minecraft.client.gui.render.pip.PictureInPictureRenderer;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
+import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
+import net.minecraft.client.renderer.rendertype.RenderType;
 import net.minecraft.client.renderer.state.gui.pip.PictureInPictureRenderState;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.client.renderer.texture.OverlayTexture;
@@ -50,7 +52,7 @@ public final class TreePictureRenderer extends PictureInPictureRenderer<TreePict
                     return material==null ? Blocks.AIR.defaultBlockState()
                             : WorldBatchPaster.orient(palette.get(material),tree.axes().get(cell));
                 }) : null;
-        Map<net.minecraft.world.level.block.state.BlockState,List<BlockStateModelPart>> parts=new HashMap<>();
+        Map<net.minecraft.world.level.block.state.BlockState,Map<ChunkSectionLayer,List<BlockStateModelPart>>> parts=new HashMap<>();
         Map<net.minecraft.world.level.block.state.BlockState,int[]> tints=new HashMap<>();
         var models=mc.getModelManager().getBlockStateModelSet();
         for(var cell:snapshot.surface()) {
@@ -60,14 +62,22 @@ public final class TreePictureRenderer extends PictureInPictureRenderer<TreePict
             var modelParts=parts.computeIfAbsent(block,state->{
                 List<BlockStateModelPart> value=new ArrayList<>();
                 models.get(state).collectParts(RandomSource.create(snapshot.config().seed()),value);
-                return value;
+                return LayeredModelParts.split(value);
             });
             var tint=tints.computeIfAbsent(block,state->mc.getBlockColors().getTintSources(state)
                     .stream().mapToInt(source->source.color(state)).toArray());
             pose.pushPose(); pose.translate(cell.x(),cell.y(),cell.z());
-            collector.submitBlockModel(pose,material.woody()?RenderTypes.solidMovingBlock():RenderTypes.cutoutMovingBlock(),
-                    modelParts,tint,0xF000F0,OverlayTexture.NO_OVERLAY,0);
+            modelParts.forEach((layer,layerParts) -> collector.submitBlockModel(pose,renderType(layer),
+                    layerParts,tint,0xF000F0,OverlayTexture.NO_OVERLAY,0));
             pose.popPose();
         }
+    }
+
+    private static RenderType renderType(ChunkSectionLayer layer) {
+        return switch (layer) {
+            case SOLID -> RenderTypes.solidMovingBlock();
+            case CUTOUT -> RenderTypes.cutoutMovingBlock();
+            case TRANSLUCENT -> RenderTypes.translucentMovingBlock();
+        };
     }
 }
