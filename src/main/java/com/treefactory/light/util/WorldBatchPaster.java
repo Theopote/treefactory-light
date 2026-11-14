@@ -46,6 +46,8 @@ public final class WorldBatchPaster {
     private static final int UNDO_LIMIT = 5;
     private static final long THROTTLE_NS = 80_000_000L;
     private static final long PERSIST_THROTTLE_NS = 2_000_000_000L; // batches frequent preview-footprint writes
+    private static final long SLOW_VALIDATION_NS = 50_000_000L;
+    private static final long MAX_STATE_NBT_BYTES = 512L * 1024 * 1024;
     /** Farthest distance, in blocks, at which a preview tree may be placed; the client ray uses the same limit. */
     public static final int PLACE_RANGE = 512;
     private record CommittedTree(String dimension, Map<BlockPos,BlockState> placed, Map<BlockPos,BlockState> original) {}
@@ -215,7 +217,12 @@ public final class WorldBatchPaster {
                     message(current,"treefactory.failed");
                 } else {
                     restoreLoadedChunks();
+                    long validationStarted=System.nanoTime();
                     var validation=validatePlacement(current, level, origin, result.blocks(), sessions.get(id));
+                    long validationNanos=System.nanoTime()-validationStarted;
+                    if (validationNanos>=SLOW_VALIDATION_NS)
+                        TreefactoryLight.LOGGER.warn("Tree preview validation took {} ms for {} blocks",
+                                TimeUnit.NANOSECONDS.toMillis(validationNanos),result.blocks().size());
                     if (!validation.ok()) message(current, validation.messageKey());
                     else {
                         Map<BlockPos,BlockState> blocks = new LinkedHashMap<>();
@@ -765,13 +772,19 @@ public final class WorldBatchPaster {
         Path path=dataFile();
         if (!Files.isRegularFile(path)) return true;
         try {
-            readState(NbtIo.readCompressed(path, NbtAccounter.unlimitedHeap()));
+            readState(readStateFile(path,stateNbtQuota(Runtime.getRuntime().maxMemory())));
             return true;
         } catch (IOException | RuntimeException e) {
             sessions.clear(); deferredSessions.clear(); undo.clear();
             TreefactoryLight.LOGGER.error("Could not load preview state from {}; tree previews and undo are disabled to preserve the file",path,e);
             return false;
         }
+    }
+    static long stateNbtQuota(long maxHeap) {
+        return Math.min(maxHeap / 4, MAX_STATE_NBT_BYTES);
+    }
+    static CompoundTag readStateFile(Path path, long quota) throws IOException {
+        return NbtIo.readCompressed(path,NbtAccounter.create(quota));
     }
     private void readState(CompoundTag root) {
         sessions.clear(); deferredSessions.clear(); undo.clear();

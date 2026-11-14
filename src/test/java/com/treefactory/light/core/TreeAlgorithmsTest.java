@@ -85,15 +85,38 @@ class TreeAlgorithmsTest {
     @Test void generatedLogsFormOneFaceConnectedTree() {
         for(TreeType preset:TreeType.values()) {
             var blocks=new TreeBuildTask().build(TreeConfig.defaults().withTreeType(preset),()->false).blocks();
-            Set<Cell> logs=new HashSet<>(); blocks.forEach((cell,material)->{if(material.woody()) logs.add(cell);});
-            Deque<Cell> queue=new ArrayDeque<>(); Cell first=logs.iterator().next(); logs.remove(first); queue.add(first);
-            int[][] steps={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
-            while(!queue.isEmpty()) {
-                Cell c=queue.removeFirst();
-                for(int[] d:steps) { Cell n=new Cell(c.x()+d[0],c.y()+d[1],c.z()+d[2]); if(logs.remove(n)) queue.addLast(n); }
-            }
-            assertTrue(logs.isEmpty(),preset+" has disconnected branch voxels");
+            assertWoodConnected(blocks,preset.name());
         }
+    }
+    @Test void everyCanopyShapeIsDeterministicAndConnectedAtParameterExtremes() {
+        for (CanopyShape shape : CanopyShape.values()) {
+            for (boolean maximum : new boolean[] {false,true}) {
+                var base=TreeConfig.defaults();
+                var config=base.withSeed(maximum ? 54831 : -91237)
+                        .withTrunkHeight(maximum ? TreeConfig.MAX_HEIGHT : TreeConfig.MIN_HEIGHT)
+                        .withCanopy(shape,maximum ? TreeConfig.MAX_CANOPY_SCALE : TreeConfig.MIN_CANOPY_SCALE,
+                                maximum ? TreeConfig.MAX_DENSITY : TreeConfig.MIN_DENSITY)
+                        .withCrownStretch(maximum ? TreeConfig.MAX_STRETCH : TreeConfig.MIN_STRETCH)
+                        .withCrownLayers(maximum ? TreeConfig.MAX_LAYERS : TreeConfig.MIN_LAYERS);
+                var first=new TreeBuildTask().build(config,() -> false);
+                var second=new TreeBuildTask().build(config,() -> false);
+                assertEquals(first,second,shape+" maximum="+maximum);
+                assertWoodConnected(first.blocks(),shape+" maximum="+maximum);
+            }
+        }
+    }
+
+    private static void assertWoodConnected(Map<Cell,Voxelizer.Material> blocks, String label) {
+        Set<Cell> logs=new HashSet<>(); blocks.forEach((cell,material)->{if(material.woody()) logs.add(cell);});
+        Cell root=new Cell(0,0,0);
+        assertTrue(logs.remove(root),label+" is missing its root");
+        Deque<Cell> queue=new ArrayDeque<>(); queue.add(root);
+        int[][] steps={{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
+        while(!queue.isEmpty()) {
+            Cell c=queue.removeFirst();
+            for(int[] d:steps) { Cell n=new Cell(c.x()+d[0],c.y()+d[1],c.z()+d[2]); if(logs.remove(n)) queue.addLast(n); }
+        }
+        assertTrue(logs.isEmpty(),label+" has disconnected branch voxels");
     }
     @Test void perlinNoiseIsContinuousAndSeeded() {
         NoiseGenerator a=new NoiseGenerator(123),b=new NoiseGenerator(123);
