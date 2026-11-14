@@ -102,6 +102,8 @@
   "treefactory.nothing_to_undo": "Nothing to undo",
   "treefactory.undo_unloaded": "Cannot undo: tree blocks are in unloaded chunks",
   "treefactory.undo_dimension": "Cannot undo: the tree's dimension is unavailable",
+  "treefactory.undo_busy": "Wait for the current undo or cancel the preview first",
+  "treefactory.undo_started": "Undoing tree",
   "treefactory.undo_nothing_left": "That tree was already changed; nothing left to undo",
   "treefactory.undo_failed": "Could not undo the last tree; blocks may have changed",
   "treefactory.undo_partial_failed": "Undo partially failed; some blocks could not be restored",

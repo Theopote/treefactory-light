@@ -3,7 +3,6 @@ package com.treefactory.light.util;
 import com.treefactory.light.TreefactoryLight;
 import com.treefactory.light.core.tree.PreviewRevision;
 import com.treefactory.light.core.tree.TreePlacementValidator;
-import com.treefactory.light.core.tree.UndoPlanner;
 import com.treefactory.light.core.algorithm.Voxelizer;
 import com.treefactory.light.core.config.TreeConfig;
 import com.treefactory.light.core.tree.Cell;
@@ -42,6 +41,8 @@ public final class WorldBatchPaster {
     static final int PLACE_SESSION_BUDGET = 4096;
     static final int RESTORE_BUDGET = 8192;
     static final int RESTORE_SESSION_BUDGET = 4096;
+    static final int UNDO_BUDGET = 8192;
+    static final int UNDO_SESSION_BUDGET = 4096;
     private static final int UNDO_LIMIT = 5;
     private static final long THROTTLE_NS = 80_000_000L;
     private static final long PERSIST_THROTTLE_NS = 2_000_000_000L; // batches frequent preview-footprint writes
@@ -58,6 +59,7 @@ public final class WorldBatchPaster {
     private record DeferredSession(UUID player, Session session) {}
     private record PendingChunk(ServerLevel level, ChunkPos pos) {}
     private record Request(BlockPos origin, TreeConfig config, long revision) {}
+    private record UndoJob(ServerLevel level, CommittedTree tree, BatchedUndo<BlockPos,BlockState> batch) {}
     private static final class Placement {
         final Session session;
         final long revision;
@@ -88,6 +90,7 @@ public final class WorldBatchPaster {
     private final LatestPreviewQueue<UUID,Request> queued = new LatestPreviewQueue<>();
     private final Map<UUID,Long> lastPreview = new HashMap<>();
     private final Map<UUID,ArrayDeque<CommittedTree>> undo = new HashMap<>();
+    private final Map<UUID,UndoJob> undoJobs = new LinkedHashMap<>();
     // Single background thread so writes to the save file are always serialized, never concurrent.
     private final ExecutorService persistExecutor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "treefactory-light-persist"); t.setDaemon(true); return t;
@@ -138,6 +141,7 @@ public final class WorldBatchPaster {
         if (storageUnavailable) { message(player,"treefactory.storage_unavailable"); return; }
         if (!authorized(player)) return;
         UUID id = player.getUUID();
+        if (undoJobs.containsKey(id)) { message(player,"treefactory.undo_busy"); return; }
         long revision = revisions.next(id);
         queued.put(id, new Request(origin, config, revision));
         startQueued();
@@ -251,6 +255,11 @@ public final class WorldBatchPaster {
     /** Keeps the current preview tree permanently (after any in-flight rebuild finishes). */
     public void requestCommit(ServerPlayer player, long requestId) {
         commitRequests.put(player.getUUID(), requestId);
+        if (undoJobs.containsKey(player.getUUID())) {
+            message(player,"treefactory.undo_busy");
+            notifyCommitResult(player,false);
+            return;
+        }
         if (storageUnavailable) {
             message(player,"treefactory.storage_unavailable");
             notifyCommitResult(player,false);
@@ -304,37 +313,52 @@ public final class WorldBatchPaster {
         if (storageUnavailable) { message(player,"treefactory.storage_unavailable"); return; }
         if (!authorized(player)) return;
         UUID id=player.getUUID();
+        if (undoJobs.containsKey(id) || sessions.containsKey(id) || placements.containsKey(id)
+                || pending.containsKey(id) || queued.containsKey(id)) {
+            message(player,"treefactory.undo_busy");
+            return;
+        }
         ArrayDeque<CommittedTree> stack=undo.get(id);
         if (stack==null || stack.isEmpty()) { message(player,"treefactory.nothing_to_undo"); return; }
         CommittedTree tree=stack.peekLast();
         ServerLevel level=level(tree.dimension());
         if (level==null) { message(player,"treefactory.undo_dimension"); return; }
-        Map<BlockPos,BlockState> restore=UndoPlanner.planRestorations(tree.placed(), tree.original(),
-                pos -> chunkReady(level, pos) ? level.getBlockState(pos) : null,
-                pos -> chunkReady(level, pos));
-        if (restore==null) { message(player,"treefactory.undo_unloaded"); return; }
-        if (restore.isEmpty()) {
-            stack.removeLast();
-            persist(true);
-            message(player,"treefactory.undo_nothing_left");
-            return;
+        undoJobs.put(id,new UndoJob(level,tree,new BatchedUndo<>(tree.placed(),tree.original())));
+        message(player,"treefactory.undo_started");
+    }
+
+    private void tickUndos() {
+        int budget=UNDO_BUDGET;
+        for (UUID id : new ArrayList<>(undoJobs.keySet())) {
+            if (budget<=0) break;
+            UndoJob job=undoJobs.remove(id);
+            if (job==null) continue;
+            ServerPlayer player=server.getPlayerList().getPlayer(id);
+            if (player==null) continue;
+            if (!authorized(player)) continue;
+            var result=job.batch().tick(Math.min(budget,UNDO_SESSION_BUDGET),
+                    pos -> chunkReady(job.level(),pos), pos -> job.level().mayInteract(player,pos),
+                    job.level()::getBlockState, (pos,state) -> job.level().setBlock(pos,state,FLAGS));
+            budget-=result.consumed();
+            switch (result.status()) {
+                case PROGRESS -> undoJobs.put(id,job);
+                case COMPLETE -> {
+                    ArrayDeque<CommittedTree> stack=undo.get(id);
+                    if (stack==null || stack.peekLast()!=job.tree()) {
+                        TreefactoryLight.LOGGER.error("Undo history changed during undo for {}",id);
+                        message(player,"treefactory.undo_failed");
+                        break;
+                    }
+                    stack.removeLast();
+                    persist(true);
+                    if (result.restored()==0) message(player,"treefactory.undo_nothing_left");
+                    else player.sendSystemMessage(Component.translatable("treefactory.undone",result.restored()),false);
+                }
+                case UNLOADED -> message(player,"treefactory.undo_unloaded");
+                case PROTECTED -> message(player,"treefactory.target_protected");
+                case WRITE_FAILED -> message(player,result.restored()>0 ? "treefactory.undo_partial_failed" : "treefactory.undo_failed");
+            }
         }
-        int restored=0, failed=0;
-        for (var cell : restore.entrySet()) {
-            BlockPos pos=cell.getKey();
-            if (!level.getBlockState(pos).equals(tree.placed().get(pos))) continue;
-            if (level.setBlock(pos, cell.getValue(), FLAGS)) restored++;
-            else failed++;
-        }
-        if (failed>0) {
-            message(player, restored>0 ? "treefactory.undo_partial_failed" : "treefactory.undo_failed");
-            dirty=true;
-            persist(true);
-            return;
-        }
-        stack.removeLast();
-        persist(true);
-        player.sendSystemMessage(Component.translatable("treefactory.undone",restored),false);
     }
     /** Removes the preview tree and restores the world. */
     public void discard(UUID id) {
@@ -349,7 +373,7 @@ public final class WorldBatchPaster {
         defer(id,session);
         dirty=true;
     }
-    public void disconnect(UUID id) { discard(id); persist(true); }
+    public void disconnect(UUID id) { undoJobs.remove(id); discard(id); persist(true); }
     public void attach(MinecraftServer server) {
         this.server=server;
         storageUnavailable=!load();
@@ -376,11 +400,12 @@ public final class WorldBatchPaster {
             try { finalWrite.get(10, TimeUnit.SECONDS); }
             catch (Exception e) { TreefactoryLight.LOGGER.warn("Timed out saving preview state on shutdown", e); }
         }
-        sessions.clear(); deferredSessions.clear(); pendingChunks.clear(); failedRestoreChunks.clear(); commitRequests.clear(); undo.clear(); server=null;
+        sessions.clear(); deferredSessions.clear(); pendingChunks.clear(); failedRestoreChunks.clear(); commitRequests.clear(); undoJobs.clear(); undo.clear(); server=null;
     }
     public void tick() {
         restoreBudgetRemaining=RESTORE_BUDGET;
         restoreLoadedChunks();
+        tickUndos();
         startQueued();
         tickPlacements();
         if (dirty) persist(false);
