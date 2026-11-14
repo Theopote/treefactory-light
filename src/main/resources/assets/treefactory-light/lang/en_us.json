@@ -104,6 +104,7 @@
   "treefactory.undo_dimension": "Cannot undo: the tree's dimension is unavailable",
   "treefactory.operation_busy": "Wait for the current operation or cancel the preview first",
   "treefactory.undo_started": "Undoing tree",
+  "treefactory.undo_save_retry": "Could not save the undo record; retrying. Check the server log",
   "treefactory.commit_save_retry": "Could not save the build record; retrying. Check the server log",
   "treefactory.undo_nothing_left": "That tree was already changed; nothing left to undo",
   "treefactory.undo_failed": "Could not undo the last tree; blocks may have changed",
