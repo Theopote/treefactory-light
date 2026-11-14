@@ -256,10 +256,22 @@ public final class WorldBatchPaster {
             notifyCommitResult(player,false);
             return;
         }
+        if (!authorized(player)) {
+            revisions.clearCommitTarget(player.getUUID());
+            notifyCommitResult(player,false);
+            return;
+        }
         commit(player);
     }
     private void commit(ServerPlayer player) {
         UUID id=player.getUUID();
+        Session current=sessions.get(id);
+        if (!authorized(player) || (current!=null && current.level!=player.level())) {
+            revisions.clearCommitTarget(id);
+            message(player,"treefactory.commit_failed");
+            notifyCommitResult(player,false);
+            return;
+        }
         if (pending.containsKey(id) || queued.containsKey(id) || placements.containsKey(id)) {
             revisions.requestCommit(id, revisions.latest(id));
             startQueued();

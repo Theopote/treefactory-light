@@ -42,6 +42,7 @@ public final class ClientTreeState {
     public FinishPhase finishPhase() { return finish.phase(); }
     public boolean isGenerating() { return generating; }
     public boolean update(TreeConfig next) {
+        if(finish.phase()!=FinishPhase.NONE) return false;
         if(config.equals(next)) return true;
         // Imported presets may reference missing blocks or blocks outside the allowed palette.
         try { WorldBatchPaster.palette(next); }
@@ -87,6 +88,7 @@ public final class ClientTreeState {
     }
     /** Places the tree where the cursor points; guiX/guiY are in scaled GUI coordinates. */
     public void placeAtCursor(double guiX,double guiY) {
+        if(finish.phase()!=FinishPhase.NONE) return;
         Minecraft mc=Minecraft.getInstance();
         if(mc.player==null || mc.level==null) return;
         Vec3 dir=cursorRay(mc,guiX,guiY), eye=mc.gameRenderer.mainCamera().position();
@@ -200,7 +202,7 @@ public final class ClientTreeState {
         ClientPlayNetworking.send(new C2SUndoTreePacket());
     }
     public void cycleScale(int direction) {
-        update(config.withScale(config.scale().cycle(direction)));
+        if(!update(config.withScale(config.scale().cycle(direction)))) return;
         var player=Minecraft.getInstance().player;
         if(player!=null) player.sendOverlayMessage(Component.translatable("treefactory.trunk_height",String.format("%.1f",config.trunkHeight())));
     }

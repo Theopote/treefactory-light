@@ -38,7 +38,7 @@ public final class DrawerScreen extends Screen {
     private int panel, scroll, contentHeight;
     private boolean library, materialsOpen, shapesOpen = true;
     private ShapeGrid shapeGrid;
-    private Button finishButton;
+    private Button finishButton, newSeedButton;
     private PresetStore.Preset menuPreset;
     private int menuX, menuY, materialLeft, materialWidth;
     private static final int MENU_W = 70, MENU_H = 18;
@@ -89,8 +89,9 @@ public final class DrawerScreen extends Screen {
             refresh();
         })));
 
-        fixed.add(addWidget(button(M, height - BOTTOM_BAR + 2, half, "treefactory.new_seed",
-                () -> state.update(state.config().withSeed(new Random().nextLong())))));
+        newSeedButton = button(M, height - BOTTOM_BAR + 2, half, "treefactory.new_seed",
+                () -> state.update(state.config().withSeed(new Random().nextLong())));
+        fixed.add(addWidget(newSeedButton));
         finishButton = button(M + half + 2, height - BOTTOM_BAR + 2, half, "treefactory.finish_tree", this::onFinishClicked);
         fixed.add(addWidget(finishButton));
         updateFinishButton();
@@ -103,6 +104,7 @@ public final class DrawerScreen extends Screen {
                     () -> { materialsOpen = false; refresh(); }, this::refresh);
         }
         clampScroll();
+        syncFinishInteraction();
     }
 
     private void buildLibrary(int w) {
@@ -212,6 +214,7 @@ public final class DrawerScreen extends Screen {
             if (minecraft.gui.screen() == this) onClose();
         });
         updateFinishButton();
+        syncFinishInteraction();
     }
 
     private void updateFinishButton() {
@@ -229,6 +232,7 @@ public final class DrawerScreen extends Screen {
     public void tick() {
         super.tick();
         updateFinishButton();
+        syncFinishInteraction();
     }
 
     private void addContent(AbstractWidget widget) {
@@ -242,7 +246,14 @@ public final class DrawerScreen extends Screen {
 
     private void syncWidgetInteraction(AbstractWidget widget) {
         widget.visible = inContentViewport(widget);
-        widget.active = widget.visible;
+        widget.active = widget.visible && state.finishPhase() == ClientTreeState.FinishPhase.NONE;
+    }
+
+    private void syncFinishInteraction() {
+        boolean editable = state.finishPhase() == ClientTreeState.FinishPhase.NONE;
+        syncAllContentWidgets();
+        if (newSeedButton != null) newSeedButton.active = editable;
+        for (AbstractWidget widget : materialWidgets) widget.active = editable;
     }
 
     @Override
@@ -456,6 +467,7 @@ public final class DrawerScreen extends Screen {
             }
             if (super.mouseClicked(event, doubleClick)) return true;
             if (materialsOpen && !library && event.button() == InputConstants.MOUSE_BUTTON_LEFT
+                    && state.finishPhase() == ClientTreeState.FinishPhase.NONE
                     && materials.click(event.x(), event.y())) return true;
             return true;
         }
