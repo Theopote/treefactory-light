@@ -60,6 +60,14 @@ public final class WorldBatchPaster {
     private record PendingChunk(ServerLevel level, ChunkPos pos) {}
     private record Request(BlockPos origin, TreeConfig config, long revision) {}
     private record UndoJob(ServerLevel level, CommittedTree tree, BatchedUndo<BlockPos,BlockState> batch) {}
+    private static final class PendingCommit {
+        final int blocks;
+        final CommitWrite write;
+        PendingCommit(int blocks, CompletableFuture<Void> write) {
+            this.blocks=blocks;
+            this.write=new CommitWrite(write);
+        }
+    }
     private static final class Placement {
         final Session session;
         final long revision;
@@ -91,6 +99,7 @@ public final class WorldBatchPaster {
     private final Map<UUID,Long> lastPreview = new HashMap<>();
     private final Map<UUID,ArrayDeque<CommittedTree>> undo = new HashMap<>();
     private final Map<UUID,UndoJob> undoJobs = new LinkedHashMap<>();
+    private final Map<UUID,PendingCommit> pendingCommits = new LinkedHashMap<>();
     // Single background thread so writes to the save file are always serialized, never concurrent.
     private final ExecutorService persistExecutor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "treefactory-light-persist"); t.setDaemon(true); return t;
@@ -141,7 +150,7 @@ public final class WorldBatchPaster {
         if (storageUnavailable) { message(player,"treefactory.storage_unavailable"); return; }
         if (!authorized(player)) return;
         UUID id = player.getUUID();
-        if (undoJobs.containsKey(id)) { message(player,"treefactory.undo_busy"); return; }
+        if (undoJobs.containsKey(id) || pendingCommits.containsKey(id)) { message(player,"treefactory.operation_busy"); return; }
         long revision = revisions.next(id);
         queued.put(id, new Request(origin, config, revision));
         startQueued();
@@ -254,12 +263,12 @@ public final class WorldBatchPaster {
     }
     /** Keeps the current preview tree permanently (after any in-flight rebuild finishes). */
     public void requestCommit(ServerPlayer player, long requestId) {
-        commitRequests.put(player.getUUID(), requestId);
-        if (undoJobs.containsKey(player.getUUID())) {
-            message(player,"treefactory.undo_busy");
-            notifyCommitResult(player,false);
+        if (undoJobs.containsKey(player.getUUID()) || pendingCommits.containsKey(player.getUUID())) {
+            message(player,"treefactory.operation_busy");
+            commitNotifier.notify(player,requestId,false);
             return;
         }
+        commitRequests.put(player.getUUID(), requestId);
         if (storageUnavailable) {
             message(player,"treefactory.storage_unavailable");
             notifyCommitResult(player,false);
@@ -305,17 +314,36 @@ public final class WorldBatchPaster {
                 committed.placed(), committed.original()));
         trimUndoHistory(stack);
         revisions.clear(id);
-        persist(true);
-        player.sendSystemMessage(Component.translatable("treefactory.built",committed.placed().size()),false);
-        notifyCommitResult(player, true);
+        pendingCommits.put(id,new PendingCommit(committed.placed().size(),persist(true)));
+    }
+
+    private void tickCommits() {
+        for (var entry : new ArrayList<>(pendingCommits.entrySet())) {
+            UUID id=entry.getKey();
+            PendingCommit commit=entry.getValue();
+            var status=commit.write.poll(System.nanoTime(),PERSIST_THROTTLE_NS,() -> persist(true));
+            if (status==CommitWrite.Status.WAITING) continue;
+            if (status==CommitWrite.Status.FAILED) {
+                TreefactoryLight.LOGGER.error("Commit persistence failed for {}; will retry",id,commit.write.error());
+                ServerPlayer player=server.getPlayerList().getPlayer(id);
+                if (player!=null) message(player,"treefactory.commit_save_retry");
+                continue;
+            }
+            pendingCommits.remove(id);
+            ServerPlayer player=server.getPlayerList().getPlayer(id);
+            if (player!=null) {
+                player.sendSystemMessage(Component.translatable("treefactory.built",commit.blocks),false);
+                notifyCommitResult(player,true);
+            } else commitRequests.remove(id);
+        }
     }
     public void undo(ServerPlayer player) {
         if (storageUnavailable) { message(player,"treefactory.storage_unavailable"); return; }
         if (!authorized(player)) return;
         UUID id=player.getUUID();
-        if (undoJobs.containsKey(id) || sessions.containsKey(id) || placements.containsKey(id)
+        if (undoJobs.containsKey(id) || pendingCommits.containsKey(id) || sessions.containsKey(id) || placements.containsKey(id)
                 || pending.containsKey(id) || queued.containsKey(id)) {
-            message(player,"treefactory.undo_busy");
+            message(player,"treefactory.operation_busy");
             return;
         }
         ArrayDeque<CommittedTree> stack=undo.get(id);
@@ -400,11 +428,12 @@ public final class WorldBatchPaster {
             try { finalWrite.get(10, TimeUnit.SECONDS); }
             catch (Exception e) { TreefactoryLight.LOGGER.warn("Timed out saving preview state on shutdown", e); }
         }
-        sessions.clear(); deferredSessions.clear(); pendingChunks.clear(); failedRestoreChunks.clear(); commitRequests.clear(); undoJobs.clear(); undo.clear(); server=null;
+        sessions.clear(); deferredSessions.clear(); pendingChunks.clear(); failedRestoreChunks.clear(); commitRequests.clear(); undoJobs.clear(); pendingCommits.clear(); undo.clear(); server=null;
     }
     public void tick() {
         restoreBudgetRemaining=RESTORE_BUDGET;
         restoreLoadedChunks();
+        tickCommits();
         tickUndos();
         startQueued();
         tickPlacements();
