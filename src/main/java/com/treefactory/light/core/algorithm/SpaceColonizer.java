@@ -10,6 +10,7 @@ public final class SpaceColonizer {
     public static final int MAX_NODES = 2800;
     public static final int MAX_WILLOW_NODES = 5000;
     public static final int MAX_ITERATIONS = 160;
+    private static final double PROP_ROOT_DESCENT = .719;
 
     public List<TreeNode> generate(TreeConfig config) { return generate(config, () -> false); }
 
@@ -136,7 +137,7 @@ public final class SpaceColonizer {
             check(cancelled);
             int anchor = 1 + random.nextInt(maxTrunk - 1);
             double angle = random.nextDouble() * Math.PI * 2;
-            double down = 0.35 + config.branchDroop() * 0.45;
+            double down = PROP_ROOT_DESCENT;
             double out = 0.9;
             int parent = anchor;
             int steps = 3 + (int)(config.trunkHeight() * 0.07);

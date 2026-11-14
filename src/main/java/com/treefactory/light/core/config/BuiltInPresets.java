@@ -16,7 +16,8 @@ public final class BuiltInPresets {
     private static List<PresetStore.Preset> create() {
         List<PresetStore.Preset> list = new ArrayList<>();
         for (TreeType type : TreeType.values())
-            list.add(preset(type.id(), TreeConfig.defaults().withTreeType(type)));
+            if (type != TreeType.MANGROVE)
+                list.add(preset(type.id(), TreeConfig.defaults().withTreeType(type)));
         list.add(preset("birch", tree(TreeType.OAK, 18, 2101L, .2, .45, .7,
                 CanopyShape.OVOID, 1.0, 1.1, .4, palette("birch", "oak", .96, .04, 0), .55, 0, .55)));
         list.add(preset("cherry", tree(TreeType.OAK, 14, 2102L, .55, .8, .85,
@@ -30,7 +31,7 @@ public final class BuiltInPresets {
                 CanopyShape.SPINDLE_MULTI_LAYER, 1.6, 1.2, .8, palette("jungle", "oak", .94, .04, .02), .52, 0, .38)));
         list.add(preset("cypress", tree(TreeType.OAK, 20, 2106L, .15, .25, .85,
                 CanopyShape.PROLATE_ELLIPSOID, .9, 1.2, .4, palette("spruce", "oak", .98, .02, 0), .1, .04, .92)));
-        list.add(preset("mangrove", tree(TreeType.OAK, 15, 2107L, .65, .8, .8,
+        list.add(preset("mangrove", tree(TreeType.MANGROVE, 15, 2107L, .65, .8, .8,
                 CanopyShape.HEMISPHERE, 1.3, 1.1, .8, palette("mangrove", "oak", .96, .04, 0), .55, .82, .38)));
         list.add(preset("snag", tree(TreeType.DEAD, 20, 2108L, .8, .7, .5,
                 CanopyShape.HEMISPHERE, 1.0, 1.0, .2, palette("pale_oak", "oak", 1, 0, 0), .4, 0, .7)));

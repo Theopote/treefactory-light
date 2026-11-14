@@ -4,7 +4,7 @@ import com.treefactory.light.core.algorithm.Voxelizer;
 import java.util.*;
 import java.util.function.Predicate;
 
-/** Filters blocked cells and, when wood is blocked, keeps only the rooted tree. */
+/** Filters blocked cells and removes tree components disconnected by obstacles. */
 public final class TreePlacementValidator {
     public record Result(boolean ok, String messageKey, Map<Cell, Voxelizer.Material> placeable) {
         public static Result ok(Map<Cell, Voxelizer.Material> placeable) {
@@ -29,7 +29,7 @@ public final class TreePlacementValidator {
             Predicate<Cell> canInteract, Predicate<Cell> replaceable) {
         Map<Cell, Voxelizer.Material> placeable = new LinkedHashMap<>();
         String firstBlock = null;
-        boolean anyWoody = false, blockedWood = false;
+        boolean anyWoody = false, blockedWood = false, blockedLeaf = false;
         Cell origin=new Cell(0,0,0);
         String originBlock=null;
         for (var entry : blocks.entrySet()) {
@@ -43,7 +43,7 @@ public final class TreePlacementValidator {
                 String reason=blocked != null ? blocked : "treefactory.target_protected";
                 if (firstBlock == null) firstBlock=reason;
                 if (cell.equals(origin)) originBlock=reason;
-            }
+            } else blockedLeaf=true;
             anyWoody |= material.woody();
         }
         if (placeable.values().stream().noneMatch(Voxelizer.Material::woody))
@@ -62,8 +62,23 @@ public final class TreePlacementValidator {
             long totalWood=blocks.values().stream().filter(Voxelizer.Material::woody).count();
             long keptWood=placeable.values().stream().filter(Voxelizer.Material::woody).count();
             if (keptWood < totalWood * MIN_WOOD_RATIO) return Result.fail("treefactory.tree_mostly_blocked");
+        } else if (blockedLeaf) {
+            Set<Cell> previouslyConnected=connectedToWood(blocks);
+            Set<Cell> stillConnected=connectedToWood(placeable);
+            placeable.entrySet().removeIf(entry -> !entry.getValue().woody()
+                    && previouslyConnected.contains(entry.getKey()) && !stillConnected.contains(entry.getKey()));
         }
         return Result.ok(placeable);
+    }
+
+    private static Set<Cell> connectedToWood(Map<Cell,Voxelizer.Material> cells) {
+        Set<Cell> reachable=new HashSet<>();
+        ArrayDeque<Cell> queue=new ArrayDeque<>();
+        cells.forEach((cell,material) -> {
+            if (material.woody()) { reachable.add(cell); queue.addLast(cell); }
+        });
+        flood(queue, reachable, cells, false);
+        return reachable;
     }
 
     private static void flood(ArrayDeque<Cell> queue, Set<Cell> reachable,

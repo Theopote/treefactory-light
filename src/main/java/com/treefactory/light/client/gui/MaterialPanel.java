@@ -125,7 +125,7 @@ final class MaterialPanel {
     }
 
     private BlockPalette defaults() {
-        return BlockPalette.defaults(state.config().treeType() == TreeType.PINE ? "spruce" : "oak");
+        return BlockPalette.defaults(state.config().treeType().defaultWood());
     }
 
     static int contentHeightFor(int height) { return Math.max(height, 220); }

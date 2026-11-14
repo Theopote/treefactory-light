@@ -57,8 +57,7 @@ public record TreeConfig(TreeType treeType, long seed,
         return new TreeConfig(treeType, value, crookedness, spread, fullness, canopyShape,canopyScale,attractionDensity,taper,blockPalette,trunkHeight,trunkThickness,crownStretch,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence);
     }
     public TreeConfig withTreeType(TreeType type) {
-        String wood = type == TreeType.PINE ? "spruce" : "oak";
-        return new TreeConfig(type,seed,crookedness,spread,fullness,CanopyShape.forPreset(type),canopyScale,attractionDensity,taper,BlockPalette.defaults(wood),trunkHeight,trunkThickness,crownStretch,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence);
+        return new TreeConfig(type,seed,crookedness,spread,fullness,CanopyShape.forPreset(type),canopyScale,attractionDensity,taper,BlockPalette.defaults(type.defaultWood()),trunkHeight,trunkThickness,crownStretch,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence);
     }
     public TreeConfig withCanopy(CanopyShape shape,double canopyScale,double density) {
         return new TreeConfig(treeType,seed,crookedness,spread,fullness,shape,canopyScale,density,taper,blockPalette,trunkHeight,trunkThickness,crownStretch,crownLayers,branchAngleBias,branchDroop,apicalDominance,gravityInfluence);

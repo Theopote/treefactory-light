@@ -57,4 +57,18 @@ class PreviewRevisionTest {
         assertTrue(revisions.isStale(first, player));
         assertFalse(revisions.isStale(revisions.latest(player), player));
     }
+
+    @Test void clearingOnePlayerDoesNotAffectOtherPlayers() {
+        var revisions=new PreviewRevision();
+        UUID first=UUID.randomUUID(), second=UUID.randomUUID();
+        revisions.markApplied(first,revisions.next(first));
+        revisions.markApplied(second,revisions.next(second));
+        revisions.requestCommit(first,revisions.latest(first));
+        revisions.clear(first);
+        assertFalse(revisions.readyToCommit(first));
+        assertNull(revisions.commitTarget(first));
+        assertTrue(revisions.readyToCommit(second));
+        revisions.clearAll();
+        assertFalse(revisions.readyToCommit(second));
+    }
 }

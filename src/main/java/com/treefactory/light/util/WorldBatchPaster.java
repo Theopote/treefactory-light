@@ -393,7 +393,8 @@ public final class WorldBatchPaster {
         cancelPlacement(id);
         AtomicBoolean flag=pending.remove(id); if(flag!=null) flag.set(true);
         commitRequests.remove(id);
-        revisions.clearCommitTarget(id);
+        revisions.clear(id);
+        lastPreview.remove(id);
         queued.remove(id);
         Session session=sessions.remove(id);
         if (session==null) return;
@@ -411,7 +412,7 @@ public final class WorldBatchPaster {
         persist(true);
     }
     public void stop() {
-        pending.values().forEach(f -> f.set(true)); pending.clear(); revisions.clearCommitTargets(); queued.clear();
+        pending.values().forEach(f -> f.set(true)); pending.clear(); revisions.clearAll(); queued.clear();
         for (UUID id : new ArrayList<>(placements.keySet())) cancelPlacement(id);
         for (UUID id : new ArrayList<>(sessions.keySet())) {
             Session session=sessions.get(id);
@@ -428,7 +429,7 @@ public final class WorldBatchPaster {
             try { finalWrite.get(10, TimeUnit.SECONDS); }
             catch (Exception e) { TreefactoryLight.LOGGER.warn("Timed out saving preview state on shutdown", e); }
         }
-        sessions.clear(); deferredSessions.clear(); pendingChunks.clear(); failedRestoreChunks.clear(); commitRequests.clear(); undoJobs.clear(); pendingCommits.clear(); undo.clear(); server=null;
+        sessions.clear(); deferredSessions.clear(); pendingChunks.clear(); failedRestoreChunks.clear(); commitRequests.clear(); undoJobs.clear(); pendingCommits.clear(); undo.clear(); lastPreview.clear(); server=null;
     }
     public void tick() {
         restoreBudgetRemaining=RESTORE_BUDGET;

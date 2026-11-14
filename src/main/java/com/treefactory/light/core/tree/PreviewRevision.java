@@ -50,5 +50,9 @@ public final class PreviewRevision {
         commitTarget.remove(player);
     }
 
-    public void clearCommitTargets() { commitTarget.clear(); }
+    public void clearAll() {
+        latest.clear();
+        applied.clear();
+        commitTarget.clear();
+    }
 }

@@ -19,7 +19,7 @@ public record C2SPreviewTreePacket(BlockPos origin, @Nullable TreeConfig config,
         if ((config == null) == (validationError == null))
             throw new IllegalArgumentException("Expected either a preview configuration or a validation error");
     }
-    public static final Type<C2SPreviewTreePacket> TYPE = new Type<>(Identifier.fromNamespaceAndPath(TreefactoryLight.MOD_ID, "preview_tree_v6"));
+    public static final Type<C2SPreviewTreePacket> TYPE = new Type<>(Identifier.fromNamespaceAndPath(TreefactoryLight.MOD_ID, "preview_tree_v7"));
     public static final StreamCodec<RegistryFriendlyByteBuf,C2SPreviewTreePacket> CODEC = CustomPacketPayload.codec(C2SPreviewTreePacket::write,C2SPreviewTreePacket::read);
     private void write(RegistryFriendlyByteBuf b) {
         if (config==null) throw new IllegalStateException("Cannot send an invalid preview");

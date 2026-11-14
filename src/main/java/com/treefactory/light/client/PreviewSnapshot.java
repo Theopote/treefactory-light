@@ -2,12 +2,17 @@ package com.treefactory.light.client;
 
 import com.treefactory.light.core.config.TreeConfig;
 import com.treefactory.light.core.tree.*;
+import net.minecraft.core.BlockPos;
 import java.util.*;
 
 public record PreviewSnapshot(TreeConfig config, TreeBuildTask.Result tree,
                               List<Cell> surface, double centerY, double extent,
                               int blockWidth,int blockHeight,int blockDepth) {
     public static final int[][] OFFSETS={{-1,0,0},{1,0,0},{0,-1,0},{0,1,0},{0,0,-1},{0,0,1}};
+    public boolean containsAt(BlockPos origin, BlockPos position) {
+        return tree.blocks().containsKey(new Cell(position.getX()-origin.getX(),
+                position.getY()-origin.getY(),position.getZ()-origin.getZ()));
+    }
     public static PreviewSnapshot create(TreeConfig config,TreeBuildTask.Result tree) {
         List<Cell> surface=new ArrayList<>();
         int minX=Integer.MAX_VALUE,maxX=Integer.MIN_VALUE,minY=Integer.MAX_VALUE,maxY=Integer.MIN_VALUE;

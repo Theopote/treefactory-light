@@ -64,6 +64,19 @@ class MorphologyTest {
         assertTrue(cypress.apicalDominance() > acacia.apicalDominance());
     }
 
+    @Test void propRootsDependOnTreeTypeNotDroopingBranches() {
+        TreeConfig mangrove=preset("builtin-mangrove");
+        TreeConfig willow=TreeConfig.defaults().withTreeType(TreeType.WILLOW);
+        for (double droop : new double[] {0, 1}) {
+            TreeConfig rootTree=mangrove.withMorphology(mangrove.branchAngleBias(),droop,mangrove.apicalDominance());
+            TreeConfig hangingTree=willow.withMorphology(willow.branchAngleBias(),droop,willow.apicalDominance());
+            assertTrue(BranchMorphology.growsPropRoots(rootTree));
+            assertFalse(BranchMorphology.growsPropRoots(hangingTree));
+            assertTrue(countPropRoots(new SpaceColonizer().generate(rootTree)) >= 4);
+        }
+        assertEquals(mangrove, PresetStore.decode("id",PresetStore.encode("Mangrove","Tester",mangrove)).config());
+    }
+
     @Test void morphologyRoundTripsThroughPresetStore() {
         TreeConfig config = TreeConfig.defaults().withMorphology(0.82, 0.71, 0.29).withGravityInfluence(0.64);
         var decoded = PresetStore.decode("id", PresetStore.encode("Morph", "Tester", config)).config();

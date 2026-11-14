@@ -150,6 +150,6 @@ public enum CanopyShape {
         return Math.max(Math.abs(y)-1,x*x+z*z-radius2);
     }
     public static CanopyShape forPreset(TreeType preset) {
-        return switch(preset) { case PINE -> CONE; case WILLOW -> UMBRELLA; case DEAD -> HEMISPHERE; default -> ELLIPSOID; };
+        return switch(preset) { case PINE -> CONE; case WILLOW -> UMBRELLA; case DEAD, MANGROVE -> HEMISPHERE; default -> ELLIPSOID; };
     }
 }

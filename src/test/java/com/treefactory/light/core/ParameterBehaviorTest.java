@@ -6,6 +6,7 @@ import com.treefactory.light.core.algorithm.SpaceColonizer;
 import com.treefactory.light.core.algorithm.Voxelizer;
 import com.treefactory.light.core.config.CanopyShape;
 import com.treefactory.light.core.config.TreeConfig;
+import com.treefactory.light.core.config.TreeType;
 import com.treefactory.light.core.tree.TreeBuildTask;
 import com.treefactory.light.core.tree.TreeNode;
 import com.treefactory.light.core.tree.Vector3;
@@ -25,7 +26,7 @@ class ParameterBehaviorTest {
     }
 
     @Test void spreadDoesNotControlVerticalScaleOrPropRoots() {
-        var config=TreeConfig.defaults().withCanopy(CanopyShape.SPHERE,1.25,1.25)
+        var config=TreeConfig.defaults().withTreeType(TreeType.MANGROVE).withCanopy(CanopyShape.SPHERE,1.25,1.25)
                 .withMorphology(.5,.8,.5);
         var low=config.withParameters(config.crookedness(),0,config.fullness());
         var high=config.withParameters(config.crookedness(),1,config.fullness());

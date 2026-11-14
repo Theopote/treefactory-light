@@ -2,7 +2,6 @@ package com.treefactory.light.client;
 
 import com.treefactory.light.TreefactoryLight;
 import com.treefactory.light.core.config.*;
-import com.treefactory.light.core.tree.Cell;
 import com.treefactory.light.core.tree.TreeBuildTask;
 import com.treefactory.light.network.*;
 import com.treefactory.light.util.WorldBatchPaster;
@@ -101,9 +100,8 @@ public final class ClientTreeState {
      * ground behind it and the new tree would be placed one block above the preview. Preview blocks are skipped.
      */
     private HitResult clipIgnoringPreview(Minecraft mc,Vec3 eye,Vec3 dir) {
-        Set<BlockPos> own=new HashSet<>();
-        if(previewOrigin!=null && preview!=null)
-            for(Cell cell:preview.tree().blocks().keySet()) own.add(previewOrigin.offset(cell.x(),cell.y(),cell.z()));
+        PreviewSnapshot currentPreview=preview;
+        BlockPos currentOrigin=previewOrigin;
         Vec3 end=eye.add(dir.scale(WorldBatchPaster.PLACE_RANGE)), start=eye;
         for(int i=0;i<256;i++) {
             BlockHitResult hit= null;
@@ -112,7 +110,8 @@ public final class ClientTreeState {
                     hit = mc.level.clip(new ClipContext(start,end,ClipContext.Block.OUTLINE,ClipContext.Fluid.NONE,mc.player));
                 }
             }
-            if (hit != null && (hit.getType() != HitResult.Type.BLOCK || !own.contains(hit.getBlockPos()))) return hit;
+            if (hit != null && (hit.getType() != HitResult.Type.BLOCK || currentPreview==null || currentOrigin==null
+                    || !currentPreview.containsAt(currentOrigin,hit.getBlockPos()))) return hit;
             BlockPos skipped= null;
             if (hit != null) {
                 skipped = hit.getBlockPos();

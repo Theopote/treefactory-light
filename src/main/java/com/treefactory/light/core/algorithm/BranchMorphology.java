@@ -20,6 +20,6 @@ public final class BranchMorphology {
     }
 
     public static boolean growsPropRoots(TreeConfig config) {
-        return config.branchDroop() >= 0.65;
+        return config.treeType() == TreeType.MANGROVE;
     }
 }

@@ -65,4 +65,30 @@ class TreePlacementValidatorTest {
         assertEquals(Voxelizer.Material.MAIN_TRUNK, result.placeable().get(new Cell(0, 0, 0)));
         assertFalse(result.placeable().containsKey(new Cell(2, 2, 0)));
     }
+
+    @Test void blockedLeafRemovesOnlyNewlyDisconnectedLeaves() {
+        Cell root=new Cell(0,0,0), blocked=new Cell(1,0,0), detached=new Cell(2,0,0);
+        Cell attached=new Cell(0,1,0), previouslyIsolated=new Cell(8,0,0);
+        Map<Cell,Voxelizer.Material> blocks=Map.of(root,Voxelizer.Material.MAIN_TRUNK,
+                blocked,Voxelizer.Material.PRIMARY_LEAF, detached,Voxelizer.Material.SECONDARY_LEAF,
+                attached,Voxelizer.Material.PRIMARY_LEAF, previouslyIsolated,Voxelizer.Material.ACCENT);
+        var result=TreePlacementValidator.validate(blocks, cell -> null, cell -> true, cell -> !cell.equals(blocked));
+        assertTrue(result.ok());
+        assertFalse(result.placeable().containsKey(detached));
+        assertTrue(result.placeable().containsKey(attached));
+        assertTrue(result.placeable().containsKey(previouslyIsolated));
+        assertEquals(blocks,TreePlacementValidator.validate(blocks, cell -> null, cell -> true, cell -> true).placeable());
+    }
+
+    @Test void blockedLeafKeepsLeavesWithAnotherPathToWood() {
+        Cell root=new Cell(0,0,0), blocked=new Cell(1,0,0), leaf=new Cell(2,0,0);
+        Map<Cell,Voxelizer.Material> blocks=Map.of(root,Voxelizer.Material.MAIN_TRUNK,
+                blocked,Voxelizer.Material.PRIMARY_LEAF, leaf,Voxelizer.Material.PRIMARY_LEAF,
+                new Cell(0,1,0),Voxelizer.Material.PRIMARY_LEAF,
+                new Cell(1,1,0),Voxelizer.Material.PRIMARY_LEAF,
+                new Cell(2,1,0),Voxelizer.Material.PRIMARY_LEAF);
+        var result=TreePlacementValidator.validate(blocks, cell -> null, cell -> true, cell -> !cell.equals(blocked));
+        assertTrue(result.ok());
+        assertTrue(result.placeable().containsKey(leaf));
+    }
 }

@@ -36,4 +36,14 @@ class PreviewPacketTest {
             buffer.release();
         }
     }
+    @Test void mangroveTypeRoundTrips() {
+        var buffer=new RegistryFriendlyByteBuf(Unpooled.buffer(),RegistryAccess.EMPTY);
+        try {
+            var packet=new C2SPreviewTreePacket(BlockPos.ZERO,TreeConfig.defaults().withTreeType(TreeType.MANGROVE));
+            C2SPreviewTreePacket.CODEC.encode(buffer,packet);
+            assertEquals(packet,C2SPreviewTreePacket.CODEC.decode(buffer));
+        } finally {
+            buffer.release();
+        }
+    }
 }
